@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">Practice Player</string>
+    <string name="file_button">Load File</string>
+    <string name="dummy_content">START\nSCREEN</string>
+    <string name="play_button">Play and Pause</string>
+    <string name="marker_button">Selection Begin and End</string>
+</resources>

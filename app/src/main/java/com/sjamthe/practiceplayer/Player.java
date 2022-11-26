@@ -2,6 +2,9 @@ package com.sjamthe.practiceplayer;
 
 import static android.media.AudioManager.AUDIO_SESSION_ID_GENERATE;
 import static android.media.AudioTrack.MODE_STREAM;
+import static android.media.AudioTrack.PLAYSTATE_PAUSED;
+import static android.media.AudioTrack.PLAYSTATE_PLAYING;
+import static android.media.AudioTrack.PLAYSTATE_STOPPED;
 
 import android.content.Context;
 import android.media.AudioAttributes;
@@ -30,10 +33,13 @@ public class Player {
     MediaExtractor extractor;
     MediaCodec codec;
     AudioTrack audioTrack = null;
+    final long kTimeoutUs = 5000;
+
 
     public void setAudioFile(Uri uri, Context applicationContext) {
         audioUri = uri;
         ctx = applicationContext;
+
         extractor = new MediaExtractor();
 
         try {
@@ -61,40 +67,79 @@ public class Player {
         codec.configure(format, null, null, 0);
         codec.start();
         extractor.selectTrack(0);
+    }
 
+    private void writeToTrack() {
+
+        MediaCodec.BufferInfo info = new MediaCodec.BufferInfo();
+        int noOutputCounter = 0;
+        short[] res;
+        int record_data_play_pos = 0;
+
+        int outputBufferId = codec.dequeueOutputBuffer(info, kTimeoutUs);
+        if (outputBufferId >= 0) {
+            noOutputCounter++;
+            res = getSamplesForChannel(outputBufferId, 0);
+            int ret = audioTrack.write(res, 0, res.length);
+            /* if(ret >= 0)
+                record_data_play_pos += ret;
+            Log.i(LOG_TAG, "Total shorts written : " + record_data_play_pos);*/
+            codec.releaseOutputBuffer(outputBufferId, false);
+        }
+        if ((info.flags & MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) {
+            Log.d(LOG_TAG, "saw output EOS.");
+        }
+    }
+
+    private void createAudioTrack() {
+        MediaFormat format = extractor.getTrackFormat(0);
+        int sampleRate = format.getInteger(MediaFormat.KEY_SAMPLE_RATE);
         final int minBufferSize = AudioTrack.getMinBufferSize(sampleRate,
+
                 AudioFormat.CHANNEL_OUT_MONO, AudioFormat.ENCODING_PCM_16BIT);
 
         AudioAttributes audioAttributes = new AudioAttributes.Builder()
                 .setUsage(AudioAttributes.USAGE_MEDIA)
                 .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
                 .build();
-        AudioFormat aformat = new AudioFormat.Builder()
+        AudioFormat audioFormat = new AudioFormat.Builder()
                 .setSampleRate(sampleRate)
                 .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
                 .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
                 .build();
 
-        audioTrack = new AudioTrack(audioAttributes, aformat, minBufferSize, MODE_STREAM,
-                                AUDIO_SESSION_ID_GENERATE);
+        audioTrack = new AudioTrack(audioAttributes, audioFormat, minBufferSize, MODE_STREAM,
+                AUDIO_SESSION_ID_GENERATE);
+
+/*        audioTrack.setPositionNotificationPeriod(minBufferSize/2);
+
+        audioTrack.setPlaybackPositionUpdateListener(
+                new AudioTrack.OnPlaybackPositionUpdateListener() {
+            @Override // android.media.AudioTrack.OnPlaybackPositionUpdateListener
+            public void onMarkerReached(AudioTrack audioTrack) {
+                Log.v(LOG_TAG, "MarkerReached");
+            }
+
+            @Override // android.media.AudioTrack.OnPlaybackPositionUpdateListener
+            public void onPeriodicNotification(AudioTrack audioTrack) {
+                // Log.v(LOG_TAG, "onPeriodicNotification");
+                Player.this.writeToTrack();
+            }
+        });*/
+
+        audioTrack.play();
     }
 
-    void extractToAudioRecord() {
+    void extractAudio() {
         // Loop through the extractor extracting sampleData
         // use codec to convert each data
         // Add data to AudioRecord
         // Play audio record data
-        final long kTimeoutUs = 5000;
         boolean sawInputEOS = false;
-        boolean sawOutputEOS = false;
         long presentationTimeUs;
-        MediaCodec.BufferInfo info = new MediaCodec.BufferInfo();
-        int noOutputCounter = 0;
-        short[] res;
-        int record_data_play_pos = 0;
+        boolean writeOnce = false;
 
-        audioTrack.play();
-        while (!sawOutputEOS) {
+        while (!sawInputEOS) {
             int inputBufferId = codec.dequeueInputBuffer(kTimeoutUs);
             if (inputBufferId >= 0) {
                 ByteBuffer inputBuffer = codec.getInputBuffer(inputBufferId);
@@ -103,7 +148,6 @@ public class Player {
                 if (inputBufSize < 0) {
                     Log.d(LOG_TAG, "End of input steam reached.");
                     sawInputEOS = true;
-                    break;
                 } else {
                     presentationTimeUs = extractor.getSampleTime();
                     codec.queueInputBuffer(inputBufferId, 0, inputBufSize, presentationTimeUs,
@@ -112,27 +156,12 @@ public class Player {
                 if (!sawInputEOS) {
                     extractor.advance();
                 }
-            }
-            int outputBufferId = codec.dequeueOutputBuffer(info, kTimeoutUs);
-            if (outputBufferId >= 0) {
-                noOutputCounter++;
-                res = getSamplesForChannel(outputBufferId, 0);
-                int ret = audioTrack.write(res, 0, res.length);
-                if(ret >= 0)
-                    record_data_play_pos += ret;
-                Log.i(LOG_TAG, "Total shorts written : " + record_data_play_pos);
-                codec.releaseOutputBuffer(outputBufferId, false);
-            }
-            if ((info.flags & MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) {
-                Log.d(LOG_TAG, "saw output EOS.");
-                sawOutputEOS = true;
+            } else {
+                writeToTrack();
             }
         }
-        audioTrack.stop();
-        audioTrack.release();
-        audioTrack = null;
-        codec.stop();
-        codec.release();
+        Log.v(LOG_TAG, "Track finished");
+        audioTrack.flush();
     }
 
     // Assumes the buffer PCM encoding is 16 bit.
@@ -165,39 +194,52 @@ public class Player {
                 MediaMetadataRetriever.METADATA_KEY_TITLE);
     }
 
-    public boolean play(Context ctx) {
-        extractToAudioRecord();
-        /*
-        if (mPlayer == null) {
-            mPlayer = MediaPlayer.create(ctx, audioUri);
-        }
-        try {
-            if (mPlayer.isPlaying()) {
-                release();
-                return false;
-            } else {
-                mPlayer.start();
-                return true;
+    public void play() {
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    if (audioTrack == null || audioTrack.getPlayState() == PLAYSTATE_STOPPED) {
+                        createAudioTrack();
+                        extractAudio();
+                        release();
+                    } else if (audioTrack.getPlayState() == PLAYSTATE_PAUSED) {
+                        audioTrack.play();
+                    }
+                } catch (IllegalStateException e) {
+                    audioTrack.stop();
+                    Log.e(LOG_TAG," Thread stopped :" + e.toString());
+                }
+
             }
-        } catch (IllegalStateException e) {
-            Log.e(LOG_TAG, "Exception during play " + e.toString());
-            return false;
-        }
-         */
-        return true;
+        }).start();
     }
 
     public boolean isPlaying() {
-        if (mPlayer == null) {
-            return false;
+        if (audioTrack != null && audioTrack.getPlayState() == PLAYSTATE_PLAYING) {
+            return true;
         } else {
-            return mPlayer.isPlaying();
+            return false;
         }
     }
 
-    private void release() {
-        mPlayer.release();
-        mPlayer = null;
+    public void release() {
+        if(audioTrack == null || audioTrack.getState() == PLAYSTATE_STOPPED)
+            return;
+
+        audioTrack.stop();
+        // codec.stop();
+        // codec.release();
+        audioTrack.release();
+        extractor.release();
+        // audioTrack = null;
+        // extractor = null;
         Log.e(LOG_TAG, "Stopped playing");
+    }
+
+    public void pause() {
+        if (audioTrack != null) {
+            audioTrack.pause();
+        }
     }
 }

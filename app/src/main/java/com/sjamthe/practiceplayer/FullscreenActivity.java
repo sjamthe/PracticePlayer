@@ -64,8 +64,11 @@ public class FullscreenActivity extends AppCompatActivity {
                     if(uri != null) {
                         if (player == null) {
                             player = new Player();
+                        } else {
+                            player.release();
                         }
                         player.setAudioFile(uri, getApplicationContext());
+                        playButton.setImageResource(R.drawable.ic_baseline_play_arrow_24);
                         fullscreenContent.setText(player.getMediaLocation());
                     } else {
                         fullscreenContent.setText("No file selected");
@@ -181,17 +184,15 @@ public class FullscreenActivity extends AppCompatActivity {
             @Override
             public void onClick(View v) {
                 if(player != null) {
-                    if (player.play(getApplicationContext())) {
                         if(player.isPlaying()) {
-                            playButton.setImageResource(R.drawable.ic_baseline_pause_24);
-                        } else {
+                            player.pause();
                             playButton.setImageResource(R.drawable.ic_baseline_play_arrow_24);
+                        } else {
+                            player.play();
+                            playButton.setImageResource(R.drawable.ic_baseline_pause_24);
                         }
-                    } else {
-                        playButton.setImageResource(R.drawable.ic_baseline_play_arrow_24);
                     }
                 }
-            }
         });
     }
 

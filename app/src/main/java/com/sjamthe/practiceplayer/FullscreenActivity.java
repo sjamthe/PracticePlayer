@@ -1,5 +1,7 @@
 package com.sjamthe.practiceplayer;
 
+import static java.lang.Integer.parseInt;
+
 import android.annotation.SuppressLint;
 
 import androidx.activity.result.ActivityResultCallback;
@@ -8,13 +10,14 @@ import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.appcompat.app.ActionBar;
 import androidx.appcompat.app.AppCompatActivity;
 
-import android.content.Context;
+import android.database.Cursor;
 import android.media.MediaMetadataRetriever;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.provider.OpenableColumns;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.WindowInsets;
@@ -22,6 +25,8 @@ import android.widget.ImageButton;
 import android.widget.TextView;
 
 import com.sjamthe.practiceplayer.databinding.ActivityFullscreenBinding;
+
+import java.util.concurrent.Callable;
 
 /**
  * An example full-screen activity that shows and hides the system UI (i.e.
@@ -55,6 +60,9 @@ public class FullscreenActivity extends AppCompatActivity {
     private final Handler mHideHandler = new Handler(Looper.myLooper());
     private View mContentView;
 
+    Callable<Void> audioTrackDone = null;
+    Uri selectedUri = null;
+
     ActivityResultLauncher<String> mGetContent = registerForActivityResult(
             new ActivityResultContracts.GetContent(),
             new ActivityResultCallback<Uri>() {
@@ -62,19 +70,54 @@ public class FullscreenActivity extends AppCompatActivity {
                 public void onActivityResult(Uri uri) {
                     fullscreenContent = findViewById(R.id.fullscreen_content);
                     if(uri != null) {
-                        if (player == null) {
-                            player = new Player();
-                        } else {
-                            player.release();
-                        }
-                        player.setAudioFile(uri, getApplicationContext());
+                        selectedUri = uri;
+                        MediaMetadataRetriever retriever =  new MediaMetadataRetriever();
+                        retriever.setDataSource(getApplicationContext(), uri);
+                        String keyDuration = retriever.extractMetadata(
+                                MediaMetadataRetriever.METADATA_KEY_DURATION);
+
+                        int durationInSecs = 0;
+                        if (keyDuration != null)
+                            durationInSecs = Math.round(parseInt(keyDuration)/1000);
+
+                        String title = retriever.extractMetadata(
+                                MediaMetadataRetriever.METADATA_KEY_TITLE);
+                        if(title == null)
+                            title = getFileName(uri);
+
+                        fullscreenContent.setText(title + "\n" + durationInSecs + " (secs)");
+
                         playButton.setImageResource(R.drawable.ic_baseline_play_arrow_24);
-                        fullscreenContent.setText(player.getMediaLocation());
+                        retriever.release();
                     } else {
                         fullscreenContent.setText("No file selected");
                     }
                 }
             });
+
+    @SuppressLint("Range")
+    public String getFileName(Uri uri) {
+        String result = null;
+        if (uri.getScheme().equals("content")) {
+            Cursor cursor = getContentResolver().query(uri, null, null,
+                    null, null);
+            try {
+                if (cursor != null && cursor.moveToFirst()) {
+                    result = cursor.getString(cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME));
+                }
+            } finally {
+                cursor.close();
+            }
+        }
+        if (result == null) {
+            result = uri.getPath();
+            int cut = result.lastIndexOf('/');
+            if (cut != -1) {
+                result = result.substring(cut + 1);
+            }
+        }
+        return result;
+    }
 
     private final Runnable mHidePart2Runnable = new Runnable() {
         @SuppressLint("InlinedApi")
@@ -183,17 +226,28 @@ public class FullscreenActivity extends AppCompatActivity {
         playButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                if(player != null) {
-                        if(player.isPlaying()) {
-                            player.pause();
-                            playButton.setImageResource(R.drawable.ic_baseline_play_arrow_24);
-                        } else {
-                            player.play();
-                            playButton.setImageResource(R.drawable.ic_baseline_pause_24);
-                        }
-                    }
+                if(player == null) {
+                    player = new Player();
                 }
+                if(player.isPlaying()) {
+                    player.pause();
+                    playButton.setImageResource(R.drawable.ic_baseline_play_arrow_24);
+                } else {
+                    player.play(getApplicationContext(), selectedUri, audioTrackDone);
+                    playButton.setImageResource(R.drawable.ic_baseline_pause_24);
+                }
+            }
         });
+
+        audioTrackDone=new Callable<Void>() {  //created but not called now.
+            @Override
+            public Void call() throws Exception {
+
+                //toggle pause button to play
+                playButton.setImageResource(R.drawable.ic_baseline_play_arrow_24);
+                return null;
+            }
+        };
     }
 
     @Override

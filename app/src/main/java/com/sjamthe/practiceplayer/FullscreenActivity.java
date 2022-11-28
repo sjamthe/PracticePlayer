@@ -4,6 +4,7 @@ import static java.lang.Integer.parseInt;
 
 import android.annotation.SuppressLint;
 import android.database.Cursor;
+import android.media.AudioTrack;
 import android.media.MediaMetadataRetriever;
 import android.net.Uri;
 import android.os.Build;
@@ -15,6 +16,7 @@ import android.view.MotionEvent;
 import android.view.View;
 import android.view.WindowInsets;
 import android.widget.ImageButton;
+import android.widget.SeekBar;
 import android.widget.TextView;
 
 import androidx.activity.result.ActivityResultCallback;
@@ -34,6 +36,7 @@ import java.util.concurrent.Callable;
 public class FullscreenActivity extends AppCompatActivity {
 
     // Initializing all variables..
+    private SeekBar seekBar;
     private TextView fullscreenContent;
     private ImageButton fileButton;
     private ImageButton playButton;
@@ -67,17 +70,18 @@ public class FullscreenActivity extends AppCompatActivity {
             new ActivityResultCallback<Uri>() {
                 @Override
                 public void onActivityResult(Uri uri) {
-                    fullscreenContent = findViewById(R.id.fullscreen_content);
+                   // fullscreenContent = findViewById(R.id.fullscreen_content); /moved to onCreate
                     if(uri != null) {
                         selectedUri = uri;
                         MediaMetadataRetriever retriever =  new MediaMetadataRetriever();
                         retriever.setDataSource(getApplicationContext(), uri);
+
                         String keyDuration = retriever.extractMetadata(
                                 MediaMetadataRetriever.METADATA_KEY_DURATION);
-
+                        seekBar.setMax(parseInt(keyDuration));
                         int durationInSecs = 0;
                         if (keyDuration != null)
-                            durationInSecs = Math.round(parseInt(keyDuration)/1000);
+                            durationInSecs = Math.round(parseInt(keyDuration)/1000f);
 
                         String title = retriever.extractMetadata(
                                 MediaMetadataRetriever.METADATA_KEY_TITLE);
@@ -190,6 +194,9 @@ public class FullscreenActivity extends AppCompatActivity {
         binding = ActivityFullscreenBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
 
+        fullscreenContent = findViewById(R.id.fullscreen_content);
+        seekBar = findViewById(R.id.seek_bar);
+
         mVisible = true;
         mControlsView = binding.fullscreenContentControls;
         mContentView = binding.fullscreenContent;
@@ -225,15 +232,23 @@ public class FullscreenActivity extends AppCompatActivity {
         playButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
+                if (selectedUri == null)
+                    return; // Not initialized
+
                 if(player == null) {
                     player = new Player();
                 }
-                if(player.isPlaying()) {
-                    player.pause();
+                int playerState = player.getPlayState();
+                if(playerState == AudioTrack.PLAYSTATE_PLAYING) {
+                    player.pauseOrResume(playerState);
                     playButton.setImageResource(R.drawable.ic_baseline_play_arrow_24);
-                } else {
-                    player.play(getApplicationContext(), selectedUri, audioTrackDone);
+                } else if (playerState == AudioTrack.PLAYSTATE_PAUSED) {
+                    player.pauseOrResume(playerState);
                     playButton.setImageResource(R.drawable.ic_baseline_pause_24);
+                }
+                else {
+                    playButton.setImageResource(R.drawable.ic_baseline_pause_24);
+                    player.play(getApplicationContext(), selectedUri, audioTrackDone);
                 }
             }
         });

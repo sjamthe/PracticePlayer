@@ -178,14 +178,14 @@ public class Player {
         return res;
     }
 
-    public boolean isPlaying() {
-        if (audioTrack != null && audioTrack.getPlayState() == PLAYSTATE_PLAYING) {
-            return true;
+    public int getPlayState() {
+        if (audioTrack == null) {
+            return AudioTrack.ERROR_INVALID_OPERATION;
         } else {
-            return false;
+            return audioTrack.getPlayState();
         }
     }
-
+/*
     public void release() {
         if(audioTrack == null || audioTrack.getState() == PLAYSTATE_STOPPED)
             return;
@@ -197,11 +197,17 @@ public class Player {
         audioTrack.release();
         Log.e(LOG_TAG, "Stopped playing");
     }
-
-    public void pause() {
+*/
+    public void pauseOrResume(int state) {
         if (audioTrack != null) {
-            audioTrack.pause();
-            Log.d(LOG_TAG, "AudioTrack paused");
+            Log.d(LOG_TAG, "state = " + state);
+            if(state == AudioTrack.PLAYSTATE_PLAYING) {
+                audioTrack.pause();
+                Log.d(LOG_TAG, "AudioTrack paused");
+            } else if(state == AudioTrack.PLAYSTATE_PAUSED) {
+                audioTrack.play();
+                Log.d(LOG_TAG, "AudioTrack resumed play");
+            }
         }
     }
 }

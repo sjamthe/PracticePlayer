@@ -25,17 +25,22 @@
 
     <!-- This FrameLayout insets its children based on system windows using
          android:fitsSystemWindows. -->
-    <FrameLayout
+    <RelativeLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:fitsSystemWindows="true">
 
+        <SeekBar
+            android:id="@+id/seek_bar"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_above="@id/fullscreen_content_controls"/>
         <LinearLayout
             android:id="@+id/fullscreen_content_controls"
             style="@style/Widget.Theme.PracticePlayer.ButtonBar.Fullscreen"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_gravity="bottom|center_horizontal"
+            android:layout_alignParentBottom="true"
             android:orientation="horizontal"
             tools:ignore="UselessParent">
 
@@ -67,6 +72,6 @@
                 app:srcCompat="@drawable/ic_baseline_begin_marker_24" />
 
         </LinearLayout>
-    </FrameLayout>
+    </RelativeLayout>
 
 </FrameLayout>

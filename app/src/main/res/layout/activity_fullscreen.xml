@@ -26,6 +26,7 @@
     <!-- This FrameLayout insets its children based on system windows using
          android:fitsSystemWindows. -->
     <RelativeLayout
+        android:id="@+id/fullscreen_content_controls"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:fitsSystemWindows="true">
@@ -34,9 +35,9 @@
             android:id="@+id/seek_bar"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_above="@id/fullscreen_content_controls"/>
+            android:layout_above="@id/button_bar"/>
         <LinearLayout
-            android:id="@+id/fullscreen_content_controls"
+            android:id="@+id/button_bar"
             style="@style/Widget.Theme.PracticePlayer.ButtonBar.Fullscreen"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"

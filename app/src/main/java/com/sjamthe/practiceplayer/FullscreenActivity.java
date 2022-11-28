@@ -36,11 +36,13 @@ import java.util.concurrent.Callable;
 public class FullscreenActivity extends AppCompatActivity {
 
     // Initializing all variables..
+    private static FullscreenActivity instance;
     private SeekBar seekBar;
     private TextView fullscreenContent;
     private ImageButton fileButton;
     private ImageButton playButton;
     private Player player;
+    private final Handler mProgressHandler = new Handler(Looper.myLooper());
 
     /**
      * Whether or not the system UI should be auto-hidden after
@@ -79,6 +81,7 @@ public class FullscreenActivity extends AppCompatActivity {
                         String keyDuration = retriever.extractMetadata(
                                 MediaMetadataRetriever.METADATA_KEY_DURATION);
                         seekBar.setMax(parseInt(keyDuration));
+                        seekBar.setProgress(0);
                         int durationInSecs = 0;
                         if (keyDuration != null)
                             durationInSecs = Math.round(parseInt(keyDuration)/1000f);
@@ -120,6 +123,11 @@ public class FullscreenActivity extends AppCompatActivity {
             }
         }
         return result;
+    }
+
+    // Ideally this should run in main thread and not called from another thread
+    void updateSeekBar(long presentationTimeUs) {
+        seekBar.setProgress((int) (presentationTimeUs/1000));
     }
 
     private final Runnable mHidePart2Runnable = new Runnable() {
@@ -187,9 +195,14 @@ public class FullscreenActivity extends AppCompatActivity {
     };
     private ActivityFullscreenBinding binding;
 
+    public static FullscreenActivity getInstance() {
+        return instance;
+    }
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        instance = this;
 
         binding = ActivityFullscreenBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());

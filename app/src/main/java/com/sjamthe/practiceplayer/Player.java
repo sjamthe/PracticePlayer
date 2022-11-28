@@ -6,6 +6,7 @@ import static android.media.AudioTrack.PLAYSTATE_PAUSED;
 import static android.media.AudioTrack.PLAYSTATE_PLAYING;
 import static android.media.AudioTrack.PLAYSTATE_STOPPED;
 
+import android.app.Activity;
 import android.content.Context;
 import android.media.AudioAttributes;
 import android.media.AudioFormat;
@@ -35,6 +36,8 @@ public class Player {
 
     public void play(Context applicationContext, Uri uri, Callable<Void> audioTrackDone) {
         audioUri = uri;
+        // String fileName = FullscreenActivity.getInstance().getFileName(uri);
+
         ctx = applicationContext;
         new Thread(new Runnable() {
             @Override
@@ -116,7 +119,8 @@ public class Player {
                             MediaCodec.BUFFER_FLAG_END_OF_STREAM);
                 } else {
                     presentationTimeUs = extractor.getSampleTime();
-                   // Log.d(LOG_TAG, "before queueInputBuffer inputBufferId : " + inputBufferId);
+                    FullscreenActivity.getInstance().updateSeekBar((presentationTimeUs));
+                    // Log.d(LOG_TAG, "before queueInputBuffer inputBufferId : " + inputBufferId);
                     codec.queueInputBuffer(inputBufferId, 0, inputBufSize,
                             presentationTimeUs, 0);
                    // Log.d(LOG_TAG, "inputBufferId : " + inputBufferId);

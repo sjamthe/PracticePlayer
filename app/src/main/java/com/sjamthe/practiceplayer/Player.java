@@ -33,9 +33,12 @@ public class Player {
     final long kTimeoutUs = 5000;
     FullscreenActivity fullscreenActivity;
     long presentationTimeUs;
+    long seekTo;
+    boolean seek = false;
 
     public Player(FullscreenActivity instance) {
         fullscreenActivity = instance;
+        extractor = new MediaExtractor();
     }
 
     public void play(Context applicationContext, Uri uri) {
@@ -59,8 +62,15 @@ public class Player {
         }).start();
     }
 
+    public void playFrom(long progress) {
+        if(extractor != null) {
+            seekTo = progress;
+            seek = true;
+        }
+    }
+
     private void createAudioTrack() throws IOException {
-        extractor = new MediaExtractor();
+        // extractor = new MediaExtractor();
         extractor.setDataSource(ctx, audioUri, null);
 
         MediaFormat format = extractor.getTrackFormat(0);
@@ -118,13 +128,17 @@ public class Player {
                 } else {
                     presentationTimeUs = extractor.getSampleTime();
                     fullscreenActivity.fullScreenHandler.post(runUpdateSeeker);
-                    // Log.d(LOG_TAG, "before queueInputBuffer inputBufferId : " + inputBufferId);
                     codec.queueInputBuffer(inputBufferId, 0, inputBufSize,
                             presentationTimeUs, 0);
-                   // Log.d(LOG_TAG, "inputBufferId : " + inputBufferId);
                     if (!extractor.advance()) {
                         Log.d(LOG_TAG, "Can't advance, end of input reached.");
                         sawInputEOS = true;
+                    } else {
+                        if(seek) {
+                            codec.flush();
+                            extractor.seekTo(seekTo, MediaExtractor.SEEK_TO_PREVIOUS_SYNC);
+                            seek = false; // we are done seeking.
+                        }
                     }
                 }
             }
@@ -166,7 +180,10 @@ public class Player {
         else if (outputBufferId >= 0) {
             noOutputCounter++;
             res = getSamplesForChannel(outputBufferId, 0);
-            int ret = audioTrack.write(res, info.offset, info.offset + res.length);
+            // Don't write this buffer if seek is true
+            if(!seek) {
+                int ret = audioTrack.write(res, info.offset, info.offset + res.length);
+            }
             codec.releaseOutputBuffer(outputBufferId, false);
             // Log.d(LOG_TAG,  "output buffer id " + outputBufferId);
         }
@@ -217,6 +234,9 @@ public class Player {
         if (audioTrack != null) {
             Log.d(LOG_TAG, "state = " + state);
             if(state == PLAYSTATE_PLAYING) {
+                if(seek) {
+                    audioTrack.flush(); // we can only flush when not playing
+                }
                 audioTrack.play();
                 Log.d(LOG_TAG, "AudioTrack resumed play");
             } else if(state == PLAYSTATE_PAUSED) {

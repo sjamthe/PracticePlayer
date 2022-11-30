@@ -12,7 +12,6 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.provider.OpenableColumns;
-import android.util.Log;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.WindowInsets;
@@ -37,11 +36,12 @@ public class FullscreenActivity extends AppCompatActivity {
     // Initializing all variables..
     private static FullscreenActivity instance;
     public Handler fullScreenHandler;
-    private SeekBar seekBar;
+    private SeekBar songSeekBar;
     private TextView fullscreenContent;
     private ImageButton fileButton;
     private ImageButton playButton;
     private Player player;
+    private long seekTo = 0;
 
     /**
      * Whether or not the system UI should be auto-hidden after
@@ -86,8 +86,9 @@ public class FullscreenActivity extends AppCompatActivity {
                                 MediaMetadataRetriever.METADATA_KEY_TITLE);
                         retriever.release();
 
-                        seekBar.setMax(parseInt(keyDuration));
-                        seekBar.setProgress(0);
+                        songSeekBar.setMax(parseInt(keyDuration));
+                        songSeekBar.setProgress(0);
+                        songSeekBar.setVisibility(View.VISIBLE);
                         int durationInSecs = 0;
                         if (keyDuration != null)
                             durationInSecs = Math.round(parseInt(keyDuration)/1000f);
@@ -130,7 +131,7 @@ public class FullscreenActivity extends AppCompatActivity {
 
     // Ideally this should run in main thread and not called from another thread
     void updateSeekBar(long presentationTimeUs) {
-        seekBar.setProgress((int) (presentationTimeUs/1000));
+        songSeekBar.setProgress((int) (presentationTimeUs/1000));
     }
 
     private final Runnable mHidePart2Runnable = new Runnable() {
@@ -213,7 +214,8 @@ public class FullscreenActivity extends AppCompatActivity {
         setContentView(binding.getRoot());
 
         fullscreenContent = findViewById(R.id.fullscreen_content);
-        seekBar = findViewById(R.id.seek_bar);
+        songSeekBar = findViewById(R.id.seek_bar);
+        songSeekBar.setVisibility(View.GONE);
 
         mVisible = true;
         mControlsView = binding.fullscreenContentControls;
@@ -254,19 +256,26 @@ public class FullscreenActivity extends AppCompatActivity {
             }
         });
 
-        seekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+        songSeekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override
             public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                if(fromUser && seekBar == songSeekBar) {
+                    seekTo = progress*1000; // convert back to Us from msec
+                }
             }
 
             @Override
             public void onStartTrackingTouch(SeekBar seekBar) {
-                player.setPlayerState(AudioTrack.PLAYSTATE_PAUSED);
+                if(seekBar == songSeekBar) {
+                    player.setPlayerState(AudioTrack.PLAYSTATE_PAUSED);
+                }
             }
 
             @Override
             public void onStopTrackingTouch(SeekBar seekBar) {
-
+                if(seekBar == songSeekBar) {
+                    player.playFrom(seekTo);
+                }
             }
         });
     }

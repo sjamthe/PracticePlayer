@@ -33,8 +33,15 @@ public class Player {
     MediaCodec codec;
     AudioTrack audioTrack = null;
     final long kTimeoutUs = 5000;
+    FullscreenActivity fullscreenActivity;
+    long presentationTimeUs;
 
-    public void play(Context applicationContext, Uri uri, Callable<Void> audioTrackDone) {
+    public Player(FullscreenActivity instance) {
+        fullscreenActivity = instance;
+    }
+
+    public void play(Context applicationContext, Uri uri) {
+            // , Callable<Void> audioTrackDone) {
         audioUri = uri;
         // String fileName = FullscreenActivity.getInstance().getFileName(uri);
 
@@ -53,7 +60,9 @@ public class Player {
                     Log.e(LOG_TAG," Thread stopped :" + e.toString());
                 }
                 try {
-                    audioTrackDone.call(); //toggle works
+                    // audioTrackDone.call(); //toggle works
+                    fullscreenActivity.fullScreenHandler.post(runPlayDone);
+
                 } catch (Exception e) {
                     Log.e(LOG_TAG, "Can't call audiTrackDone"+ e.toString());
                 }
@@ -103,7 +112,6 @@ public class Player {
         // Add data to AudioRecord
         // Play audio record data
         boolean sawInputEOS = false;
-        long presentationTimeUs;
         boolean writeOnce = false;
 
         while (!sawInputEOS) {
@@ -119,7 +127,7 @@ public class Player {
                             MediaCodec.BUFFER_FLAG_END_OF_STREAM);
                 } else {
                     presentationTimeUs = extractor.getSampleTime();
-                    FullscreenActivity.getInstance().updateSeekBar((presentationTimeUs));
+                    fullscreenActivity.fullScreenHandler.post(runUpdateSeeker);
                     // Log.d(LOG_TAG, "before queueInputBuffer inputBufferId : " + inputBufferId);
                     codec.queueInputBuffer(inputBufferId, 0, inputBufSize,
                             presentationTimeUs, 0);
@@ -136,9 +144,21 @@ public class Player {
         writeToTrack(); // last write after EOS
         audioTrack.stop();
         Log.v(LOG_TAG, "Track finished");
-        // release();
     }
 
+    private final Runnable runUpdateSeeker = new Runnable() {
+        @Override
+        public void run() {
+            fullscreenActivity.updateSeekBar(presentationTimeUs);
+        }
+    };
+
+    private final Runnable runPlayDone = new Runnable() {
+        @Override
+        public void run() {
+            fullscreenActivity.setPlayButton();
+        }
+    };
     private void writeToTrack() {
 
         MediaCodec.BufferInfo info = new MediaCodec.BufferInfo();

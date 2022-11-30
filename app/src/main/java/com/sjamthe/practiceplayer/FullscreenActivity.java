@@ -37,12 +37,12 @@ public class FullscreenActivity extends AppCompatActivity {
 
     // Initializing all variables..
     private static FullscreenActivity instance;
+    public Handler fullScreenHandler;
     private SeekBar seekBar;
     private TextView fullscreenContent;
     private ImageButton fileButton;
     private ImageButton playButton;
     private Player player;
-    private final Handler mProgressHandler = new Handler(Looper.myLooper());
 
     /**
      * Whether or not the system UI should be auto-hidden after
@@ -64,7 +64,7 @@ public class FullscreenActivity extends AppCompatActivity {
     private final Handler mHideHandler = new Handler(Looper.myLooper());
     private View mContentView;
 
-    Callable<Void> audioTrackDone = null;
+    // Callable<Void> audioTrackDone = null;
     Uri selectedUri = null;
 
     ActivityResultLauncher<String> mGetContent = registerForActivityResult(
@@ -102,7 +102,7 @@ public class FullscreenActivity extends AppCompatActivity {
             });
 
     @SuppressLint("Range")
-    public String getFileName(Uri uri) {
+    String getFileName(Uri uri) {
         String result = null;
         if (uri.getScheme().equals("content")) {
             Cursor cursor = getContentResolver().query(uri, null, null,
@@ -128,6 +128,10 @@ public class FullscreenActivity extends AppCompatActivity {
     // Ideally this should run in main thread and not called from another thread
     void updateSeekBar(long presentationTimeUs) {
         seekBar.setProgress((int) (presentationTimeUs/1000));
+    }
+
+    void setPlayButton() {
+        playButton.setImageResource(R.drawable.ic_baseline_play_arrow_24);
     }
 
     private final Runnable mHidePart2Runnable = new Runnable() {
@@ -204,6 +208,8 @@ public class FullscreenActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         instance = this;
 
+        fullScreenHandler = new Handler(Looper.myLooper());
+        player = new Player(instance);
         binding = ActivityFullscreenBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
 
@@ -248,9 +254,6 @@ public class FullscreenActivity extends AppCompatActivity {
                 if (selectedUri == null)
                     return; // Not initialized
 
-                if(player == null) {
-                    player = new Player();
-                }
                 int playerState = player.getPlayState();
                 if(playerState == AudioTrack.PLAYSTATE_PLAYING) {
                     player.pauseOrResume(playerState);
@@ -261,11 +264,13 @@ public class FullscreenActivity extends AppCompatActivity {
                 }
                 else {
                     playButton.setImageResource(R.drawable.ic_baseline_pause_24);
-                    player.play(getApplicationContext(), selectedUri, audioTrackDone);
+                   //  player.play(getApplicationContext(), selectedUri, audioTrackDone);
+                    player.play(getApplicationContext(), selectedUri);
                 }
             }
         });
 
+        /*
         audioTrackDone=new Callable<Void>() {  //created but not called now.
             @Override
             public Void call() throws Exception {
@@ -275,6 +280,7 @@ public class FullscreenActivity extends AppCompatActivity {
                 return null;
             }
         };
+         */
     }
 
     @Override

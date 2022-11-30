@@ -12,6 +12,7 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.provider.OpenableColumns;
+import android.util.Log;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.WindowInsets;
@@ -26,8 +27,6 @@ import androidx.appcompat.app.ActionBar;
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.sjamthe.practiceplayer.databinding.ActivityFullscreenBinding;
-
-import java.util.concurrent.Callable;
 
 /**
  * An example full-screen activity that shows and hides the system UI (i.e.
@@ -64,7 +63,6 @@ public class FullscreenActivity extends AppCompatActivity {
     private final Handler mHideHandler = new Handler(Looper.myLooper());
     private View mContentView;
 
-    // Callable<Void> audioTrackDone = null;
     Uri selectedUri = null;
 
     ActivityResultLauncher<String> mGetContent = registerForActivityResult(
@@ -74,29 +72,34 @@ public class FullscreenActivity extends AppCompatActivity {
                 public void onActivityResult(Uri uri) {
                    // fullscreenContent = findViewById(R.id.fullscreen_content); /moved to onCreate
                     if(uri != null) {
+                        if(selectedUri != null) {
+                            // stop old play
+                            player.setPlayerState(AudioTrack.PLAYSTATE_STOPPED);
+                        }
                         selectedUri = uri;
                         MediaMetadataRetriever retriever =  new MediaMetadataRetriever();
                         retriever.setDataSource(getApplicationContext(), uri);
 
                         String keyDuration = retriever.extractMetadata(
                                 MediaMetadataRetriever.METADATA_KEY_DURATION);
+                        String title = retriever.extractMetadata(
+                                MediaMetadataRetriever.METADATA_KEY_TITLE);
+                        retriever.release();
+
                         seekBar.setMax(parseInt(keyDuration));
                         seekBar.setProgress(0);
                         int durationInSecs = 0;
                         if (keyDuration != null)
                             durationInSecs = Math.round(parseInt(keyDuration)/1000f);
 
-                        String title = retriever.extractMetadata(
-                                MediaMetadataRetriever.METADATA_KEY_TITLE);
                         if(title == null)
                             title = getFileName(uri);
 
                         fullscreenContent.setText(title + "\n" + durationInSecs + " (secs)");
 
-                        playButton.setImageResource(R.drawable.ic_baseline_play_arrow_24);
-                        retriever.release();
-                    } else {
-                        fullscreenContent.setText("No file selected");
+                        // Start playing
+                       // playButton.setImageResource(R.drawable.ic_baseline_pause_24);
+                        player.play(getApplicationContext(), selectedUri);
                     }
                 }
             });
@@ -128,10 +131,6 @@ public class FullscreenActivity extends AppCompatActivity {
     // Ideally this should run in main thread and not called from another thread
     void updateSeekBar(long presentationTimeUs) {
         seekBar.setProgress((int) (presentationTimeUs/1000));
-    }
-
-    void setPlayButton() {
-        playButton.setImageResource(R.drawable.ic_baseline_play_arrow_24);
     }
 
     private final Runnable mHidePart2Runnable = new Runnable() {
@@ -251,38 +250,53 @@ public class FullscreenActivity extends AppCompatActivity {
         playButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                if (selectedUri == null)
-                    return; // Not initialized
-
-                int playerState = player.getPlayState();
-                if(playerState == AudioTrack.PLAYSTATE_PLAYING) {
-                    player.pauseOrResume(playerState);
-                    playButton.setImageResource(R.drawable.ic_baseline_play_arrow_24);
-                } else if (playerState == AudioTrack.PLAYSTATE_PAUSED) {
-                    player.pauseOrResume(playerState);
-                    playButton.setImageResource(R.drawable.ic_baseline_pause_24);
-                }
-                else {
-                    playButton.setImageResource(R.drawable.ic_baseline_pause_24);
-                   //  player.play(getApplicationContext(), selectedUri, audioTrackDone);
-                    player.play(getApplicationContext(), selectedUri);
-                }
+                togglePlay();
             }
         });
 
-        /*
-        audioTrackDone=new Callable<Void>() {  //created but not called now.
+        seekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override
-            public Void call() throws Exception {
-
-                //toggle pause button to play
-                playButton.setImageResource(R.drawable.ic_baseline_play_arrow_24);
-                return null;
+            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
             }
-        };
-         */
+
+            @Override
+            public void onStartTrackingTouch(SeekBar seekBar) {
+                player.setPlayerState(AudioTrack.PLAYSTATE_PAUSED);
+            }
+
+            @Override
+            public void onStopTrackingTouch(SeekBar seekBar) {
+
+            }
+        });
     }
 
+    private void togglePlay() {
+        if (selectedUri == null)
+            return; // Not initialized
+
+        int playerState = player.getPlayerState();
+        if(playerState == AudioTrack.PLAYSTATE_PLAYING) {
+            player.setPlayerState(AudioTrack.PLAYSTATE_PAUSED);
+            // playButton.setImageResource(R.drawable.ic_baseline_play_arrow_24);
+        } else if (playerState == AudioTrack.PLAYSTATE_PAUSED) {
+            player.setPlayerState(AudioTrack.PLAYSTATE_PLAYING);
+           //  playButton.setImageResource(R.drawable.ic_baseline_pause_24);
+        }
+        else {
+           //  playButton.setImageResource(R.drawable.ic_baseline_pause_24);
+            player.play(getApplicationContext(), selectedUri);
+        }
+    }
+
+    void setPlayButton() {
+        int playerState = player.getPlayerState();
+        if(playerState == AudioTrack.PLAYSTATE_PLAYING) {
+            playButton.setImageResource(R.drawable.ic_baseline_pause_24);
+        } else  {
+            playButton.setImageResource(R.drawable.ic_baseline_play_arrow_24);
+        }
+    }
     @Override
     protected void onPostCreate(Bundle savedInstanceState) {
         super.onPostCreate(savedInstanceState);

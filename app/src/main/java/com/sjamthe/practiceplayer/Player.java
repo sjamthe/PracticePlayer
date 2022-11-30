@@ -6,7 +6,6 @@ import static android.media.AudioTrack.PLAYSTATE_PAUSED;
 import static android.media.AudioTrack.PLAYSTATE_PLAYING;
 import static android.media.AudioTrack.PLAYSTATE_STOPPED;
 
-import android.app.Activity;
 import android.content.Context;
 import android.media.AudioAttributes;
 import android.media.AudioFormat;
@@ -22,7 +21,6 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.ShortBuffer;
-import java.util.concurrent.Callable;
 
 public class Player {
     public final String LOG_TAG = "Player";
@@ -41,9 +39,7 @@ public class Player {
     }
 
     public void play(Context applicationContext, Uri uri) {
-            // , Callable<Void> audioTrackDone) {
         audioUri = uri;
-        // String fileName = FullscreenActivity.getInstance().getFileName(uri);
 
         ctx = applicationContext;
         new Thread(new Runnable() {
@@ -54,17 +50,10 @@ public class Player {
                         createAudioTrack();
                         extractAudio();
                     } else if (audioTrack.getPlayState() == PLAYSTATE_PAUSED) {
-                        audioTrack.play();
+                        setPlayerState(PLAYSTATE_PLAYING);
                     }
                 } catch (IllegalStateException | IOException e) {
                     Log.e(LOG_TAG," Thread stopped :" + e.toString());
-                }
-                try {
-                    // audioTrackDone.call(); //toggle works
-                    fullscreenActivity.fullScreenHandler.post(runPlayDone);
-
-                } catch (Exception e) {
-                    Log.e(LOG_TAG, "Can't call audiTrackDone"+ e.toString());
                 }
             }
         }).start();
@@ -103,7 +92,8 @@ public class Player {
         audioTrack = new AudioTrack(audioAttributes, audioFormat, minBufferSize, MODE_STREAM,
                 AUDIO_SESSION_ID_GENERATE);
 
-        audioTrack.play();
+        // audioTrack.play();
+        setPlayerState(PLAYSTATE_PLAYING);
     }
 
     void extractAudio() {
@@ -142,7 +132,8 @@ public class Player {
                 writeToTrack();
         }
         writeToTrack(); // last write after EOS
-        audioTrack.stop();
+        // audioTrack.stop();
+        setPlayerState(PLAYSTATE_STOPPED);
         Log.v(LOG_TAG, "Track finished");
     }
 
@@ -153,7 +144,7 @@ public class Player {
         }
     };
 
-    private final Runnable runPlayDone = new Runnable() {
+    private final Runnable runSetPlayButton = new Runnable() {
         @Override
         public void run() {
             fullscreenActivity.setPlayButton();
@@ -202,14 +193,14 @@ public class Player {
         return res;
     }
 
-    public int getPlayState() {
+    public int getPlayerState() {
         if (audioTrack == null) {
             return AudioTrack.ERROR_INVALID_OPERATION;
         } else {
             return audioTrack.getPlayState();
         }
     }
-/*
+/* not used - only for reference is needed
     public void release() {
         if(audioTrack == null || audioTrack.getState() == PLAYSTATE_STOPPED)
             return;
@@ -222,16 +213,21 @@ public class Player {
         Log.e(LOG_TAG, "Stopped playing");
     }
 */
-    public void pauseOrResume(int state) {
+    public void setPlayerState(int state) {
         if (audioTrack != null) {
             Log.d(LOG_TAG, "state = " + state);
-            if(state == AudioTrack.PLAYSTATE_PLAYING) {
-                audioTrack.pause();
-                Log.d(LOG_TAG, "AudioTrack paused");
-            } else if(state == AudioTrack.PLAYSTATE_PAUSED) {
+            if(state == PLAYSTATE_PLAYING) {
                 audioTrack.play();
                 Log.d(LOG_TAG, "AudioTrack resumed play");
+            } else if(state == PLAYSTATE_PAUSED) {
+                audioTrack.pause();
+                Log.d(LOG_TAG, "AudioTrack paused");
+            } else {
+                audioTrack.stop();
+                Log.d(LOG_TAG, "AudioTrack stopped");
             }
+            Log.d("PlayerThread", "state is : " + audioTrack.getState());
+            fullscreenActivity.fullScreenHandler.post(runSetPlayButton);
         }
     }
 }

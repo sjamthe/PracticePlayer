@@ -49,8 +49,10 @@ public class Player {
             public void run() {
                 try {
                     if (audioTrack == null || audioTrack.getPlayState() == PLAYSTATE_STOPPED) {
-                        createAudioTrack();
-                        extractAudio();
+                        do {
+                            createAudioTrack();
+                            extractAudio();
+                        } while (fullscreenActivity.replayState);
                     } else if (audioTrack.getPlayState() == PLAYSTATE_PAUSED) {
                         setPlayerState(PLAYSTATE_PLAYING);
                     }

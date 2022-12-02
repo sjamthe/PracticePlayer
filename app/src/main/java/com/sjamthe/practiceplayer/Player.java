@@ -38,13 +38,12 @@ public class Player {
 
     public Player(FullscreenActivity instance) {
         fullscreenActivity = instance;
-        extractor = new MediaExtractor();
     }
 
     public void play(Context applicationContext, Uri uri) {
         audioUri = uri;
-
         ctx = applicationContext;
+
         new Thread(new Runnable() {
             @Override
             public void run() {
@@ -70,7 +69,7 @@ public class Player {
     }
 
     private void createAudioTrack() throws IOException {
-        // extractor = new MediaExtractor();
+        extractor = new MediaExtractor();
         extractor.setDataSource(ctx, audioUri, null);
 
         MediaFormat format = extractor.getTrackFormat(0);

@@ -18,8 +18,8 @@
         android:gravity="center"
         android:keepScreenOn="true"
         android:text="@string/dummy_content"
-        android:textColor="#37474F"
-        android:textSize="50sp"
+        android:textColor="@color/design_default_color_on_secondary"
+        android:textSize="30sp"
         android:textStyle="bold"
         tools:ignore="TextContrastCheck" />
 
@@ -31,6 +31,37 @@
         android:layout_height="match_parent"
         android:fitsSystemWindows="true">
 
+        <TextView
+            android:id="@+id/start_position"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_alignParentStart="true"
+            android:layout_above="@id/seek_bar"
+            android:layout_marginStart="14dp"
+            android:layout_marginBottom="0dp"
+            android:textColor="@color/design_default_color_secondary"
+            android:text="0" />
+
+        <TextView
+            android:id="@+id/seek_position"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_centerInParent="true"
+            android:layout_above="@id/seek_bar"
+            android:layout_marginBottom="0dp"
+            android:textColor="@color/design_default_color_secondary"
+            android:text="0/100" />
+
+        <TextView
+            android:id="@+id/stop_position"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_alignParentEnd="true"
+            android:layout_above="@id/seek_bar"
+            android:layout_marginEnd="14dp"
+            android:layout_marginBottom="0dp"
+            android:textColor="@color/design_default_color_secondary"
+            android:text="100" />
         <SeekBar
             android:id="@+id/seek_bar"
             android:layout_width="match_parent"
@@ -43,36 +74,57 @@
             android:layout_height="wrap_content"
             android:layout_alignParentBottom="true"
             android:orientation="horizontal"
+            android:minHeight="48dp"
             tools:ignore="UselessParent">
 
-            <ImageButton
+            <com.google.android.material.button.MaterialButton
                 android:id="@+id/file_button"
+                style="@style/Widget.MaterialComponents.Button.Icon"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:contentDescription="@string/file_button"
-                android:minHeight="48dp"
-                app:srcCompat="@drawable/ic_baseline_audio_file_24" />
+                android:text=""
+                app:icon="@drawable/ic_baseline_audio_file_24"
+                app:iconGravity="textStart"/>
 
-            <ImageButton
+            <com.google.android.material.button.MaterialButton
                 android:id="@+id/play_button"
+                style="@style/Widget.MaterialComponents.Button.Icon"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:contentDescription="@string/play_button"
-                android:minHeight="48dp"
-                app:srcCompat="@drawable/ic_baseline_pause_24" />
+                android:text=""
+                app:icon="@drawable/ic_baseline_pause_24"
+                app:iconGravity="textStart"/>
 
-            <ImageButton
+            <com.google.android.material.button.MaterialButton
                 android:id="@+id/marker_button"
+                style="@style/Widget.MaterialComponents.Button.Icon"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:contentDescription="@string/marker_button"
-                android:minHeight="48dp"
-                app:srcCompat="@drawable/ic_baseline_begin_marker_24" />
+                android:text=""
+                app:icon="@drawable/ic_baseline_begin_marker_24"
+                app:iconGravity="textStart"/>
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/replay_button"
+                style="@style/Widget.MaterialComponents.Button.Icon"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:contentDescription="@string/replay_button"
+                android:text=""
+                app:icon="@drawable/ic_baseline_replay_24"
+                app:iconTint="@color/design_default_color_on_primary"
+                android:backgroundTintMode="screen"
+                app:iconGravity="textStart" />
 
         </LinearLayout>
+
     </RelativeLayout>
 
 </FrameLayout>

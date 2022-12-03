@@ -3,5 +3,6 @@
     <string name="file_button">Load File</string>
     <string name="dummy_content">Practice\nPlayer</string>
     <string name="play_button">Play and Pause</string>
-    <string name="marker_button">Selection Begin and End</string>
+    <string name="marker_button">Mark Begin and End of selection</string>
+    <string name="replay_button">Replay</string>
 </resources>

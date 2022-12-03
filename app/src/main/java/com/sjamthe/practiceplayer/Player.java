@@ -33,7 +33,7 @@ public class Player {
     final long kTimeoutUs = 5000;
     FullscreenActivity fullscreenActivity;
     long presentationTimeUs;
-    long seekTo;
+    long seekTo, startAt, stopAt;
     boolean seek = false;
 
     public Player(FullscreenActivity instance) {
@@ -70,6 +70,24 @@ public class Player {
         }
     }
 
+    public void resetMarkers() {
+        startAt = 0;
+        stopAt = -1;
+    }
+    public void setMarkerStart(long markerStartInUs) {
+       startAt = markerStartInUs;
+    }
+
+    public void setMarkerStop(long markerStopInUs) {
+       stopAt = markerStopInUs;
+    }
+
+    private void checkMarkerStart() {
+        if(startAt > presentationTimeUs) {
+            codec.flush();
+            extractor.seekTo(startAt, MediaExtractor.SEEK_TO_PREVIOUS_SYNC);
+        }
+    }
     private void createAudioTrack() throws IOException {
         extractor = new MediaExtractor();
         extractor.setDataSource(ctx, audioUri, null);
@@ -114,6 +132,8 @@ public class Player {
         // Play audio record data
         boolean sawInputEOS = false;
         boolean writeOnce = false;
+        presentationTimeUs = 0; // Initialize
+        checkMarkerStart();
 
         while (!sawInputEOS) {
             int inputBufferId = codec.dequeueInputBuffer(kTimeoutUs);
@@ -128,6 +148,10 @@ public class Player {
                             MediaCodec.BUFFER_FLAG_END_OF_STREAM);
                 } else {
                     presentationTimeUs = extractor.getSampleTime();
+                    if(stopAt > 0 & presentationTimeUs >= stopAt) {
+                        Log.d(LOG_TAG, "Reached end marker.");
+                        sawInputEOS = true;
+                    }
                     fullscreenActivity.fullScreenHandler.post(runUpdateSeeker);
                     codec.queueInputBuffer(inputBufferId, 0, inputBufSize,
                             presentationTimeUs, 0);
@@ -139,6 +163,8 @@ public class Player {
                             codec.flush();
                             extractor.seekTo(seekTo, MediaExtractor.SEEK_TO_PREVIOUS_SYNC);
                             seek = false; // we are done seeking.
+                        } else {
+                            checkMarkerStart();
                         }
                     }
                 }

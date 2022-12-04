@@ -121,7 +121,6 @@ public class Player {
         audioTrack = new AudioTrack(audioAttributes, audioFormat, minBufferSize, MODE_STREAM,
                 AUDIO_SESSION_ID_GENERATE);
 
-        // audioTrack.play();
         setPlayerState(PLAYSTATE_PLAYING);
     }
 

@@ -54,6 +54,8 @@ public class FullscreenActivity extends AppCompatActivity {
     long markerStartInUs = 0;
     long markerStopInUs = 0;
 
+    FrequencyAnalyzer frequencyAnalyzer;
+
     boolean replayState;
     boolean markerButtonAtStart; // Tracks if marker button is set to start or end
 
@@ -244,6 +246,8 @@ public class FullscreenActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         instance = this;
+
+        frequencyAnalyzer = new FrequencyAnalyzer();
 
         fullScreenHandler = new Handler(Looper.myLooper());
         player = new Player(instance);

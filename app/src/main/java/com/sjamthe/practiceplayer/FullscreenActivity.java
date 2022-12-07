@@ -360,10 +360,12 @@ public class FullscreenActivity extends AppCompatActivity {
                 if (seekBar == songSeekBar) {
                     // If markers are set use this signal to reset markers
                     // The marker closet to the current play position is set.
-                    if(markerStartInUs > 0 & Math.abs(seekToInUs-markerStartInUs)
+                    if((markerStartInUs > 0 & markerStopInUs > 0) // both markers are set
+                            & Math.abs(seekToInUs-markerStartInUs) // and seek is closer to start
                                 < Math.abs(seekToInUs-markerStopInUs)) {
                         setMarkerStartPosition(seekToInUs);
-                    } else if(markerStopInUs > 0 & Math.abs(seekToInUs-markerStartInUs)
+                    } else if((markerStartInUs > 0 & markerStopInUs > 0) // both markers are set
+                            & Math.abs(seekToInUs-markerStartInUs) // and seek is closer to end
                             > Math.abs(seekToInUs-markerStopInUs)) {
                         setMarkerStopPosition(seekToInUs);
                     } else {
@@ -417,7 +419,7 @@ public class FullscreenActivity extends AppCompatActivity {
             setMarkerStartPosition(player.presentationTimeUs);
         } else if (!markerButtonAtStart & markerStopInUs == 0) {
             setMarkerStopPosition(player.presentationTimeUs);
-        } else if (markerButtonAtStart & markerStartInUs > 0) {
+        } else {
             resetMarkerPositions();
         }
     }

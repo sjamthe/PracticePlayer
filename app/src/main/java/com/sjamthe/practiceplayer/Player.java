@@ -174,6 +174,7 @@ public class Player {
         writeToTrack(); // last write after EOS
         // audioTrack.stop();
         setPlayerState(PLAYSTATE_STOPPED);
+        codec.flush();
         Log.v(LOG_TAG, "Track finished");
     }
 

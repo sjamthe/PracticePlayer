@@ -379,6 +379,8 @@ public class FullscreenActivity extends AppCompatActivity {
 
     private void resetMarkerPositions() {
         player.resetMarkers();
+        markerButtonAtStart = true;
+        markerButton.setIconResource(R.drawable.ic_baseline_begin_marker_24);
         markerStartInUs = 0;
         markerStartPosition.setVisibility(View.GONE);
         markerStopInUs = 0;

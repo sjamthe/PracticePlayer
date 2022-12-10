@@ -24,6 +24,7 @@ import java.nio.ShortBuffer;
 
 public class Player {
     public final String LOG_TAG = "Player";
+    public FrequencyAnalyzer frequencyAnalyzer;
     private Uri audioUri;
     private Context ctx;
     MediaPlayer mPlayer = null;
@@ -208,7 +209,8 @@ public class Player {
             noOutputCounter++;
             res = getSamplesForChannel(outputBufferId, 0);
             // Don't write this buffer if seek is true
-            if(!seek) {
+            if(!seek & res.length > 0) {
+                frequencyAnalyzer.addData(res);
                 int ret = audioTrack.write(res, info.offset, info.offset + res.length);
             }
             codec.releaseOutputBuffer(outputBufferId, false);

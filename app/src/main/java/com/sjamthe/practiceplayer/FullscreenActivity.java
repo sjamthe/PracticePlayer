@@ -27,6 +27,8 @@ import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.appcompat.app.ActionBar;
 import androidx.appcompat.app.AppCompatActivity;
 
+import com.github.mikephil.charting.charts.LineChart;
+import com.github.mikephil.charting.components.Description;
 import com.google.android.material.button.MaterialButton;
 import com.sjamthe.practiceplayer.databinding.ActivityFullscreenBinding;
 
@@ -40,6 +42,7 @@ public class FullscreenActivity extends AppCompatActivity {
     private static FullscreenActivity instance;
     public Handler fullScreenHandler;
     private SeekBar songSeekBar;
+    private LineChart lineChart;
     private TextView fullscreenContent;
     private TextView songSeekBarPosition;
     private TextView markerStartPosition;
@@ -86,7 +89,6 @@ public class FullscreenActivity extends AppCompatActivity {
             new ActivityResultCallback<Uri>() {
                 @Override
                 public void onActivityResult(Uri uri) {
-                    // fullscreenContent = findViewById(R.id.fullscreen_content); /moved to onCreate
                     if (uri != null) {
                         if (selectedUri != null) {
                             // stop old play
@@ -117,6 +119,7 @@ public class FullscreenActivity extends AppCompatActivity {
                             title = getFileName(uri);
 
                         fullscreenContent.setText(title + "\n" + durationInSecs + " (secs)");
+                        fullscreenContent.setVisibility(View.GONE); // FOR TESTING Chart
 
                         // Start playing
                         player.play(getApplicationContext(), selectedUri);
@@ -246,17 +249,25 @@ public class FullscreenActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         instance = this;
-
-        frequencyAnalyzer = new FrequencyAnalyzer();
-
         fullScreenHandler = new Handler(Looper.myLooper());
-        player = new Player(instance);
         binding = ActivityFullscreenBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
 
         fullscreenContent = findViewById(R.id.fullscreen_content);
         songSeekBarPosition = findViewById(R.id.seek_position);
         songSeekBarPosition.setVisibility(View.GONE);
+
+        lineChart = findViewById(R.id.activity_main_linechart); // testing chart
+        lineChart.setTouchEnabled(true);
+        lineChart.getDescription().setEnabled(false); // disable description
+        // enable scaling and dragging
+        lineChart.setDragEnabled(true);
+        lineChart.setScaleEnabled(true);
+        lineChart.setPinchZoom(true); // force pinch zoom along both axis
+        frequencyAnalyzer = new FrequencyAnalyzer(lineChart);
+        player = new Player(instance);
+        player.frequencyAnalyzer = frequencyAnalyzer;
+
 
         markerStartPosition = findViewById(R.id.start_position);
         markerStartPosition.setVisibility(View.GONE);
@@ -269,8 +280,8 @@ public class FullscreenActivity extends AppCompatActivity {
 
         mVisible = true;
         mControlsView = binding.fullscreenContentControls;
-        mContentView = binding.fullscreenContent;
 
+        mContentView = binding.fullscreenContent;
         // Set up the user interaction to manually show or hide the system UI.
         mContentView.setOnClickListener(new View.OnClickListener() {
             @Override

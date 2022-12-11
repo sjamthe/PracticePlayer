@@ -55,7 +55,7 @@ public class FrequencyAnalyzer {
 
     double [] haanData;
     double [] inputBuffer = new double[2*(FFT_SIZE)];
-    double [] pitchBuffer = new double[(int) (30.0*SAMPLING_SIZE/ANALYZE_SIZE)]; // 10 secs
+    float [] pitchBuffer = new float[(int) (30.0*SAMPLING_SIZE/ANALYZE_SIZE)]; // 10 secs
     private int nPitches = 0;
 
     int inputPos = 0;
@@ -64,6 +64,7 @@ public class FrequencyAnalyzer {
     double threshold = VOLUME_THRESHOLD;
     FFT4g fft;
     double[] fftData;
+    static double log2C1;
 
     public FrequencyAnalyzer(LineChart lineChart) {
         this.samplingSize = SAMPLING_SIZE; // TODO : Support variable sampling_size
@@ -71,6 +72,7 @@ public class FrequencyAnalyzer {
         Log.d("FFT", "FFT_SIZE :" + FFT_SIZE + " SAMPLING_SIZE :" + samplingSize);
         Log.d("FFT", "FREQ_A1 :" + FREQ_A1 + " FREQ_C1 :" + FREQ_C1);
         haanData = haan_window();
+        log2C1 = log2(FREQ_C1);
         fft = new FFT4g(FFT_SIZE);
         this.mainChart = lineChart;
     }
@@ -114,13 +116,18 @@ public class FrequencyAnalyzer {
             double [] psData = calcPowerSpectrum(fftData);
             //Calculate Auto Correlation from with inverseFFT
             fft.rdft(-1, psData); // Note: rdft does in-place replacement for psData
-            // chartData(psData);
+            // chartData(psData)
+            double pitch = -1.0d;
+            Log.d("ANALYZE, ", "power measure " + Math.sqrt(psData[0]));
             if (Math.sqrt(psData[0]) >= this.threshold) {
-                double pitch = findPitch(psData);
-                pitchBuffer[nPitches++] = pitch;
-                if(nPitches == pitchBuffer.length)
-                    nPitches = 0;
+                pitch = findPitch(psData);
             }
+
+            float cent = FreqToCent(pitch);
+            Log.d("ANALYZE", "pitch = " + pitch + " cent: " + cent);
+            pitchBuffer[nPitches++] = cent;
+            if(nPitches == pitchBuffer.length)
+                nPitches = 0;
             chartData(pitchBuffer);
             // After analysis set analyze position for the next analyze call
             analyzePos += ANALYZE_SIZE;
@@ -128,13 +135,20 @@ public class FrequencyAnalyzer {
         }).start();
     }
 
+    public static float FreqToCent(double d) {
+        if (d < 0.0d) {
+            return -1.0f;
+        }
+        return (float) ((log2(d) - log2C1) * 12.0d * 100.0d);
+    }
+
     double [] calcPowerSpectrum(@NonNull double [] data) {
         double[] psData = new double[data.length];
         // FFT Data is returned with real part and imaginary part alternately in same array
         // even numbers are real, odd are imaginary
         // We return an array with only real part (power/magnitude no phase)
-        psData[0] = data[0]*data[0];
-        psData[1] = data[1]*data[1];
+        psData[0] = sumOfSquares(data[0], 0.0d);
+        psData[1] = sumOfSquares(data[1], 0.0d);
         for (int i = 1; i < data.length / 2; i++) {
             int realIndex = i * 2;
             int imagIndex = realIndex + 1;
@@ -166,7 +180,8 @@ public class FrequencyAnalyzer {
 
         // Step 3: Fine tune step2 freq using ACF
         double finalFreq = fineTuneStep3(acf, newFreq);
-
+        // if((finalFreq - newFreq) != 0.0)
+           // Log.d("ANALYZE", "newFreq :" + newFreq + " finalFreq : " + finalFreq + " diff " + (finalFreq/newFreq));
         return finalFreq;
     }
 
@@ -299,11 +314,11 @@ public class FrequencyAnalyzer {
         return locFound;
     }
 
-    private void chartData(double[] psData) {
+    private void chartData(float[] psData) {
         List<Entry> list = new ArrayList<>();
 
         for (int j=0; j<psData.length; j++) {
-            list.add(new Entry((float) j, (float) psData[j]));
+            list.add(new Entry((float) j, psData[j]));
         }
         showDataOnChart(list);
     }
@@ -316,8 +331,8 @@ public class FrequencyAnalyzer {
         mainChart.setData(data);
         mainChart.getAxisRight().setEnabled(false); // disable right axis, we only need left
         YAxis yAxis = mainChart.getAxisLeft();
-        yAxis.setAxisMaximum((float) FREQ_C3*4);
-        yAxis.setAxisMinimum((float) FREQ_C3/2);
+        // yAxis.setAxisMaximum((float) FREQ_C3*4);
+        // yAxis.setAxisMinimum((float) FREQ_C3/2);
         XAxis xAxis = mainChart.getXAxis();
         // xAxis.setAxisMaximum(100);
         Legend l = mainChart.getLegend();

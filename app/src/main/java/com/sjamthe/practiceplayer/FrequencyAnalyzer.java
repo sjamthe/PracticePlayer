@@ -51,7 +51,7 @@ public class FrequencyAnalyzer {
             ((int) log2(SAMPLING_SIZE / (4*FREQ_A1*(SEMITONE_INTERVAL-1)))) + 1);
     public static final int ANALYZE_SIZE = 1470;
 
-    public static final double FFT_FREQ_BAND_SIZE = SAMPLING_SIZE*2/FFT_SIZE;
+    // public static final double FFT_FREQ_BAND_SIZE = SAMPLING_SIZE*2/FFT_SIZE;
 
     double [] haanData;
     double [] inputBuffer = new double[2*(FFT_SIZE)];
@@ -63,12 +63,12 @@ public class FrequencyAnalyzer {
     double samplingSize;
     double threshold = VOLUME_THRESHOLD;
     FFT4g fft;
-
+    double[] fftData;
 
     public FrequencyAnalyzer(LineChart lineChart) {
         this.samplingSize = SAMPLING_SIZE; // TODO : Support variable sampling_size
 
-        Log.d("FFT", "FFT_SIZE :" + FFT_SIZE + " BAND :" + FFT_FREQ_BAND_SIZE);
+        Log.d("FFT", "FFT_SIZE :" + FFT_SIZE + " SAMPLING_SIZE :" + samplingSize);
         Log.d("FFT", "FREQ_A1 :" + FREQ_A1 + " FREQ_C1 :" + FREQ_C1);
         haanData = haan_window();
         fft = new FFT4g(FFT_SIZE);
@@ -105,7 +105,7 @@ public class FrequencyAnalyzer {
             // List<Entry> list = new ArrayList<>();
 
             // Prepare data to analyze
-            double[] fftData = new double[FFT_SIZE];
+            fftData = new double[FFT_SIZE];
             for (int i=analyzePos, j=0; j< FFT_SIZE; i++, j++) {
                 int pos = i% inputBuffer.length; // to support round robbin.
                 fftData[j] = inputBuffer[pos]*haanData[j];
@@ -158,73 +158,86 @@ public class FrequencyAnalyzer {
 
         int locFound = getMaxPsLoc(acf);
         double psFound = acf[locFound];
-
         //If we never found the pitch or found it but the power is less than 50% then notFound
         if (locFound == 0 || psFound < acf[0] * 0.5d) { // acf[0] has total power?
             return -1.0d;
         }
-        return  locFound;
-/*
-        double d7 = i4;
-        Double.isNaN(d7);
-        double d8 = 44100.0d / d7;
-        double d9 = get_fft_value_around_f(d8);
-        double d10 = d8 / 3.0d;
-        double d11 = get_fft_value_around_f(d10 * 2.0d);
-        if (d9 < 0.24d || d11 <= 3.15d * d9 || d10 < f_c1) {
-            double d12 = get_fft_value_around_f(1.5d * d8);
-            if (d9 >= 0.24d && d12 > 1.0d * d9) {
-                d10 = d8 / 2.0d;
-            }
-            d10 = d8 * 2.0d;
-            double d13 = get_fft_value_around_f(d10);
-            double d14 = 3.0d * d8;
-            double d15 = get_fft_value_around_f(d14);
-            if (d13 < 0.24d || d13 <= d9 * 1.25d || d15 >= d13 * 0.06d || d10 > f_c8) {
-                d10 = (d15 < 0.24d || d15 <= 1.25d * d9 || d13 >= 0.06d * d15 || d14 > f_c8) ? d8 : d14;
-                if (Math.sqrt((d9 * d9) + (d13 * d13) + (d15 * d15)) < 0.7d) {
-                    return -1.0d;
-                }
-            }
-        }
-        double d16 = (FFTSIZE / 2) - 1;
-        Double.isNaN(d16);
-        int i8 = (int) (d16 / (44100.0d / d10));
-        int i9 = 1;
-        for (int i10 = 2; i10 <= i8; i10++) {
-            double d17 = i10;
-            Double.isNaN(d17);
-            double d18 = d17 * 44100.0d;
-            double d19 = i9;
-            Double.isNaN(d19);
-            int i11 = (int) (d18 / (d10 / d19));
-            int i12 = i11 + 3;
-            int i13 = FFTSIZE;
-            if (i12 >= i13 / 2) {
-                i12 = (i13 / 2) - 1;
-            }
-            int i14 = i11 - 3;
-            double d20 = this.acf_data[i12];
-            int i15 = i12;
-            for (int i16 = i14; i16 <= i12; i16++) {
-                double[] dArr3 = this.acf_data;
-                if (dArr3[i16] >= d20) {
-                    d20 = dArr3[i16];
-                    i15 = i16;
-                }
-            }
-            if (i15 != i14 && i15 != i12) {
-                double d21 = i15;
-                Double.isNaN(d21);
-                d10 += d18 / d21;
-                i9++;
-            }
-        }
-        double d22 = i9;
-        Double.isNaN(d22);
-        return d10 / d22;
+        double freq = this.samplingSize/locFound;
+        // Step 2: fine tuning freq using FFT
+        double newFreq = fineTuneFreqWithFft(freq);
+        if((newFreq - freq) != 0.0)
+            Log.d("ANALYZE", "freq :" + freq + " newFreq : " + newFreq + " diff " + (newFreq/freq));
+        /*
 
- */
+        // Step 3:
+        double midPoint = (fftData.length / 2) - 1;
+        int maxFactor = (int) (midPoint / (samplingSize / lowerFreq));
+        int factor = 1;
+        for (int i=2; i<= maxFactor; i++) {
+
+        }
+        return lowerFreq / factor;*/
+
+        return newFreq;
+    }
+
+    // Return the FFt value near this frequency.
+    private double fftNearFreq(double freq) {
+        // TODO: try min/max Loc as (SEMITONE_INTERVAL-1)/2 apart from 1
+        int minLoc = (int) ((0.9791666666666666d * freq) / (samplingSize / fftData.length));
+        int maxLoc = (int) ((1.0208333333333333d * freq) / (samplingSize / fftData.length));
+
+        double maxAmp = 0;
+        int loc = 0; // location/tranch that has max amplitude near our freq
+        for (int i=minLoc; i<= maxLoc; i++) {
+            // 2x as FFT is double the freq (complex number);
+            double amp = sumOfSquares(fftData[2*i], fftData[2*i + 1]); // real & imaginary parts
+            if(amp > maxAmp) {
+                maxAmp = amp;
+                loc = i;
+            }
+        }
+        // We take an average by looking around two other tranches around loc.
+        double preMaxAmp = sumOfSquares(fftData[2*(loc-1)], fftData[2*(loc-1) + 1]);
+        double postMaxAmp = sumOfSquares(fftData[2*(loc+1)], fftData[2*(loc+1) + 1]);
+        double avgAmp = (maxAmp + preMaxAmp + postMaxAmp)/3.0d;
+       //  Log.d("ANALYZE", "avgAmp = " + avgAmp + " maxAmp = " + maxAmp +
+          //              " preMaxAmp = " + preMaxAmp + " postMaxAmp = " + postMaxAmp);
+                // return frequency as squareroot of the value found
+        double nearFftFreq = Math.sqrt(avgAmp);
+        // Log.d("ANALYZE", "freq = " + freq + " loc = " + loc);
+        return nearFftFreq;
+    }
+
+    // Step 2: fine tuning freq by remove resonance using FFT
+    double fineTuneFreqWithFft(double freq) {
+        double fftVal = fftNearFreq(freq);
+        double newFreq = freq/3.0d; // Why /3.0?
+        double fftVal023 = fftNearFreq(newFreq*2.0d); // Why *2.0?
+        // where are these constants coming from?
+        if (fftVal < 0.24d || fftVal023 <= fftVal*3.15d || newFreq < FREQ_MIN) {
+            double fftVal15 = fftNearFreq(1.5d * freq); // seems unnecessary
+            if(fftVal >= 0.24d && fftVal15 > 1.0d * fftVal) {
+                newFreq = freq / 2.0; // shift up from freq/3.0
+                // this step appears unnecessary as newFreq is over written after this
+            }  else {// maybe all this should be in else.
+                newFreq = freq * 2.0; // not really lower any more
+                double fftVal20 = fftNearFreq(newFreq);
+                double upperFreq = 3.0d * freq;
+                double fftVal30 = fftNearFreq(upperFreq);
+                if (fftVal20 < 0.24d || fftVal20 <= fftVal * 1.25d || fftVal30 >= fftVal20 * 0.06d || newFreq > FREQ_MAX) {
+                    if (fftVal30 < 0.24d || fftVal30 <= 1.25d * fftVal || fftVal20 >= 0.06d * fftVal30 || upperFreq > FREQ_MAX) {
+                        newFreq = freq;
+                    } else {
+                        newFreq = upperFreq;
+                    }
+                    if (Math.sqrt((fftVal * fftVal) + (fftVal20 * fftVal20) + (fftVal30 * fftVal30)) < 0.7d) {
+                        return -1.0d;
+                    }
+                }
+            }
+        }
+        return newFreq;
     }
 
     // Find location/index in acf that corresponds to max power between our Min-Max freq range
@@ -284,8 +297,8 @@ public class FrequencyAnalyzer {
         mainChart.setData(data);
         mainChart.getAxisRight().setEnabled(false); // disable right axis, we only need left
         YAxis yAxis = mainChart.getAxisLeft();
-        //yAxis.setAxisMaximum(Short.MAX_VALUE);
-        yAxis.setAxisMinimum(0);
+        yAxis.setAxisMaximum((float) FREQ_C3*4);
+        yAxis.setAxisMinimum((float) FREQ_C3/2);
         XAxis xAxis = mainChart.getXAxis();
         // xAxis.setAxisMaximum(100);
         Legend l = mainChart.getLegend();

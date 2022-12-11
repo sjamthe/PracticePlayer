@@ -17,7 +17,7 @@ public class FFT4gTest {
     FFT4g fft;
 
     @Before
-    public void setUp() throws Exception {
+    public void setUp() {
         fft = new FFT4g(FFT_SIZE);
     }
 
@@ -48,7 +48,7 @@ public class FFT4gTest {
         for (int j=0; j<a.length; j++) {
             double err = b[j] - a[j] * scale;
             err = Math.abs(err);
-            max_err = ((max_err) > (err) ? (max_err) : (err));
+            max_err = Math.max(max_err, err);
             if(max_err > 0.000000001) {
                 System.out.printf("Error At %d", j);
             }

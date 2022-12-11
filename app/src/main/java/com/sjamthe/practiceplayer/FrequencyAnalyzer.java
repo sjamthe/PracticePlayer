@@ -33,7 +33,7 @@ Hanning window is used to smooth out the signal and improve its frequency respon
 public class FrequencyAnalyzer {
     LineChart mainChart;
     public static final double FREQ_A1 = 55.0d;
-    static final double VOLUME_THRESHOLD = 2.0d;
+    static final double VOLUME_THRESHOLD = 5.0d;
     public static final double SEMITONE_INTERVAL = Math.pow(2.0d, 1.0d/12.0d);
     // Example:calculate any freq like C3 will be 12 (which is A2) +3 semitones from A1 or 130.8Hz
     public static final double FREQ_C3 = 2*FREQ_A1*Math.pow(SEMITONE_INTERVAL,3.0d); // 130.8Hz
@@ -108,7 +108,7 @@ public class FrequencyAnalyzer {
             fftData = new double[FFT_SIZE];
             for (int i=analyzePos, j=0; j< FFT_SIZE; i++, j++) {
                 int pos = i% inputBuffer.length; // to support round robbin.
-                fftData[j] = inputBuffer[pos]*haanData[j];
+                fftData[j] = inputBuffer[pos]*haanData[j]/Short.MAX_VALUE;
             }
             // Get FFT for the data.
             fft.rdft(1, fftData); // Note: rdft does in-place replacement of fftData
@@ -254,7 +254,7 @@ public class FrequencyAnalyzer {
             if(fftVal >= 0.24d && fftVal15 > 1.0d * fftVal) {
                 newFreq = freq / 2.0; // shift up from freq/3.0
                 // this step appears unnecessary as newFreq is over written after this
-            }  else {// maybe all this should be in else.
+            } else {// maybe all this should be in else.
                 newFreq = freq * 2.0; // not really lower any more
                 double fftVal20 = fftNearFreq(newFreq);
                 double upperFreq = 3.0d * freq;

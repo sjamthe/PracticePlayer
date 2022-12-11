@@ -102,16 +102,12 @@ public class FrequencyAnalyzer {
 
     void analyze() {
         new Thread(() -> {
-            // List<Entry> list = new ArrayList<>();
-
             // Prepare data to analyze
             fftData = new double[FFT_SIZE];
             for (int i=analyzePos, j=0; j< FFT_SIZE; i++, j++) {
                 int pos = i% inputBuffer.length; // to support round robbin.
                 fftData[j] = inputBuffer[pos]*haanData[j];
-                // list.add(new Entry((float) j, (float) fftData[j])); // haan+input
             }
-            // showDataOnChart(list);
             // Get FFT for the data.
             fft.rdft(1, fftData); // Note: rdft does in-place replacement of fftData
             //Get PowerSpectrum
@@ -162,23 +158,46 @@ public class FrequencyAnalyzer {
         if (locFound == 0 || psFound < acf[0] * 0.5d) { // acf[0] has total power?
             return -1.0d;
         }
-        double freq = this.samplingSize/locFound;
+        double freq = samplingSize/locFound;
         // Step 2: fine tuning freq using FFT
         double newFreq = fineTuneFreqWithFft(freq);
-        if((newFreq - freq) != 0.0)
-            Log.d("ANALYZE", "freq :" + freq + " newFreq : " + newFreq + " diff " + (newFreq/freq));
-        /*
+        //if((newFreq - freq) != 0.0)
+        //    Log.d("ANALYZE", "freq :" + freq + " newFreq : " + newFreq + " diff " + (newFreq/freq));
 
-        // Step 3:
-        double midPoint = (fftData.length / 2) - 1;
-        int maxFactor = (int) (midPoint / (samplingSize / lowerFreq));
+        // Step 3: Fine tune step2 freq using ACF
+        double finalFreq = fineTuneStep3(acf, newFreq);
+
+        return finalFreq;
+    }
+
+    //Step 3: Fine tune step2 freq using ACF
+    private double fineTuneStep3(double[] acf, double freq) {
+        double midAcfPoint = (fftData.length / 2) - 1;
+        int maxFactor = (int) (midAcfPoint / (samplingSize / freq));
         int factor = 1;
         for (int i=2; i<= maxFactor; i++) {
-
+            double acfLoc = i * samplingSize;
+            int iLoc = (int) ( acfLoc / (freq / factor));
+            int upperBound = iLoc + 3;
+            if (upperBound >= midAcfPoint + 1) {
+                upperBound = (int) midAcfPoint;
+            }
+            int lowerBound = iLoc - 3;
+            double psMax = acf[upperBound];
+            int maxPsLoc = upperBound;
+            // find maxPs between the bounds
+            for (int j=lowerBound; j<= upperBound; j++) {
+                if(acf[j] >= psMax) {
+                    psMax = acf[j];
+                    maxPsLoc = j;
+                }
+            }
+            if (maxPsLoc != lowerBound && maxPsLoc != upperBound) {
+                freq += acfLoc / (double) maxPsLoc; // Adjust frequency
+                factor++;
+            }
         }
-        return lowerFreq / factor;*/
-
-        return newFreq;
+        return freq / factor;
     }
 
     // Return the FFt value near this frequency.
@@ -215,7 +234,7 @@ public class FrequencyAnalyzer {
         double newFreq = freq/3.0d; // Why /3.0?
         double fftVal023 = fftNearFreq(newFreq*2.0d); // Why *2.0?
         // where are these constants coming from?
-        if (fftVal < 0.24d || fftVal023 <= fftVal*3.15d || newFreq < FREQ_MIN) {
+        if (fftVal < 0.24d || fftVal023 <= 3.15d * fftVal || newFreq < FREQ_MIN) {
             double fftVal15 = fftNearFreq(1.5d * freq); // seems unnecessary
             if(fftVal >= 0.24d && fftVal15 > 1.0d * fftVal) {
                 newFreq = freq / 2.0; // shift up from freq/3.0

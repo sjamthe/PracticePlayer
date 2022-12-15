@@ -103,6 +103,7 @@ public class Player {
             Log.e(LOG_TAG, e.toString());
         }
         codec.configure(format, null, null, 0);
+        frequencyAnalyzer = new FrequencyAnalyzer(sampleRate);
         codec.start();
         extractor.selectTrack(0);
 

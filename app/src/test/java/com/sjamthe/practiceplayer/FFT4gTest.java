@@ -1,20 +1,23 @@
 package com.sjamthe.practiceplayer;
 
-import static com.sjamthe.practiceplayer.FrequencyAnalyzer.FFT_SIZE;
-import static com.sjamthe.practiceplayer.FrequencyAnalyzer.SAMPLING_SIZE;
-import static com.sjamthe.practiceplayer.FrequencyAnalyzer.FREQ_A1;
-import static com.sjamthe.practiceplayer.FrequencyAnalyzer.SEMITONE_INTERVAL;
-
-import junit.framework.TestCase;
-
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 
 public class FFT4gTest {
 
+    public static final double FREQ_A1 = 55.0d;
+    public static final double SEMITONE_INTERVAL = Math.pow(2.0d, 1.0d/12.0d);
+    public static final double SAMPLING_SIZE = 44100.0d;
+    public static  final int FFT_SIZE =(int) Math.pow(2.0d,
+            ((int) log2(SAMPLING_SIZE / (4*FREQ_A1*(SEMITONE_INTERVAL-1)))) + 1);
+
     double[] signal = new double[FFT_SIZE];
     FFT4g fft;
+
+    public static double log2(double d) {
+        return Math.log(d) / Math.log(2.0d);
+    }
 
     @Before
     public void setUp() {
@@ -57,7 +60,7 @@ public class FFT4gTest {
     }
 
     @Test
-    public void setup_isCorrect() {
+    public void testSetupIsCorrect() {
         double[] a = generateRandomSample();
         Assert.assertEquals(FFT_SIZE, a.length);
     }
@@ -81,7 +84,7 @@ public class FFT4gTest {
     }
 
     @Test
-    public void rdft_RandomSample() {
+    public void testRandomSample() {
         double[] a = generateRandomSample();
         signal = a.clone(); // keep backup to compare with IFFT output
         fft.rdft(1, a); // FFT
@@ -93,16 +96,16 @@ public class FFT4gTest {
         Assert.assertTrue(max_err < 0.000000001);
     }
 
-    private static double Index2Freq(int i, double samples, int nFFT) {
-        return (double) i * (samples / nFFT);
+    private static double Index2Freq(int i) {
+        return (double) i * (SAMPLING_SIZE / FFT_SIZE);
     }
 
-    private static int Freq2Index(double freq, double samples, int nFFT) {
-        return (int) (freq / (samples / nFFT));
+    private static int Freq2Index(double freq) {
+        return (int) (freq / (SAMPLING_SIZE / FFT_SIZE));
     }
 
     @Test
-    public void rdft_sineWave() {
+    public void testSineWave() {
 
         double fftBandSize = SAMPLING_SIZE/FFT_SIZE;
 
@@ -112,7 +115,7 @@ public class FFT4gTest {
             signal = a.clone(); // keep backup to compare with IFFT output
             fft.rdft(1, a); // FFT
             int maxIndex = largestIndex(a);
-            double freq = Index2Freq(maxIndex, SAMPLING_SIZE, FFT_SIZE);
+            double freq = Index2Freq(maxIndex);
             System.out.printf("testFreq = %.1f, outputFreq = %.1f\n", testFreq, freq);
 
             //Validate that the predicted freq is within FFT band size.

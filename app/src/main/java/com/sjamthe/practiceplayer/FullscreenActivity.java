@@ -57,8 +57,6 @@ public class FullscreenActivity extends AppCompatActivity {
     long markerStartInUs = 0;
     long markerStopInUs = 0;
 
-    FrequencyAnalyzer frequencyAnalyzer;
-
     boolean replayState;
     boolean markerButtonAtStart; // Tracks if marker button is set to start or end
 
@@ -264,10 +262,7 @@ public class FullscreenActivity extends AppCompatActivity {
         lineChart.setDragEnabled(true);
         lineChart.setScaleEnabled(true);
         lineChart.setPinchZoom(true); // force pinch zoom along both axis
-        frequencyAnalyzer = new FrequencyAnalyzer(lineChart);
         player = new Player(instance);
-        player.frequencyAnalyzer = frequencyAnalyzer;
-
 
         markerStartPosition = findViewById(R.id.start_position);
         markerStartPosition.setVisibility(View.GONE);

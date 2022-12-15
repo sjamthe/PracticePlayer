@@ -28,12 +28,16 @@ https://otexts.com/fpp2/autocorrelation.html
 https://www.ymec.com/hp/signal2/acf.htm
 
 Hanning window is used to smooth out the signal and improve its frequency response.
+
+Ref:finding  tonal pitch / Sa
+https://github.com/cuthbertLab/music21/blob/master/music21/analysis/discrete.py
  */
 
 public class FrequencyAnalyzer {
     LineChart mainChart;
     public static final double FREQ_A1 = 55.0d;
     static final double VOLUME_THRESHOLD = 5.0d;
+    static final int ANALYZE_SAMPLES_PER_SECOND = 15; // can be a variable
     public static final double SEMITONE_INTERVAL = Math.pow(2.0d, 1.0d/12.0d);
     // Example:calculate any freq like C3 will be 12 (which is A2) +3 semitones from A1 or 130.8Hz
     public static final double FREQ_C3 = 2*FREQ_A1*Math.pow(SEMITONE_INTERVAL,3.0d); // 130.8Hz
@@ -41,21 +45,16 @@ public class FrequencyAnalyzer {
     public static final double FREQ_C8 = FREQ_C3*Math.pow(2.0d, 5.0d); // 4186Hz or (2^5)*C3
     public static final double FREQ_MAX = FREQ_C8; // Max frequency we want to detect
     public static final double FREQ_MIN = FREQ_C1; // Min frequency we want to detect
-    public static final double SAMPLING_SIZE = 44100.0d;
+
+    // public static final double SAMPLING_SIZE = 44100.0d; -- moved to a variable.
 
     public static double log2(double d) {
         return Math.log(d) / Math.log(2.0d);
     }
 
-    public static final int FFT_SIZE = (int) Math.pow(2.0d,
-            ((int) log2(SAMPLING_SIZE / (4*FREQ_A1*(SEMITONE_INTERVAL-1)))) + 1);
-    public static final int ANALYZE_SIZE = 1470;
-
-    // public static final double FFT_FREQ_BAND_SIZE = SAMPLING_SIZE*2/FFT_SIZE;
-
     double [] haanData;
-    double [] inputBuffer = new double[2*(FFT_SIZE)];
-    float [] pitchBuffer = new float[(int) (30.0*SAMPLING_SIZE/ANALYZE_SIZE)]; // 10 secs
+    double [] inputBuffer;
+    double [] pitchBuffer; // how many pitches do we store? one pitch per analyze call.
     private int nPitches = 0;
 
     int inputPos = 0;
@@ -63,24 +62,31 @@ public class FrequencyAnalyzer {
     double samplingSize;
     double threshold = VOLUME_THRESHOLD;
     FFT4g fft;
-    double[] fftData;
-    static double log2C1;
+    int fftSize;
+    int analyzeSize;
+    double[] fftData; // Stores FFT and iFFT
+    double[] psData; // Stores power Spectrum
+    static double log2Min;
 
-    public FrequencyAnalyzer(LineChart lineChart) {
-        this.samplingSize = SAMPLING_SIZE; // TODO : Support variable sampling_size
-
-        Log.d("FFT", "FFT_SIZE :" + FFT_SIZE + " SAMPLING_SIZE :" + samplingSize);
+    public FrequencyAnalyzer(double samplingSize) {
+        this.samplingSize = samplingSize;
+        this.fftSize = (int) Math.pow(2.0d,
+                       ((int) log2(samplingSize / (4*FREQ_A1*(SEMITONE_INTERVAL-1)))) + 1);
+        this.analyzeSize = (int) (this.samplingSize/ANALYZE_SAMPLES_PER_SECOND);
+        Log.d("FFT", "FFT_SIZE :" + this.fftSize + " SAMPLING_SIZE :" + samplingSize);
         Log.d("FFT", "FREQ_A1 :" + FREQ_A1 + " FREQ_C1 :" + FREQ_C1);
         haanData = haan_window();
-        log2C1 = log2(FREQ_C1);
-        fft = new FFT4g(FFT_SIZE);
-        this.mainChart = lineChart;
+        this.inputBuffer = new double[2*(this.fftSize)];
+        this.pitchBuffer = new double[(int) (30.0*this.samplingSize/this.analyzeSize)];
+        log2Min = log2(FREQ_MIN);
+        fft = new FFT4g(this.fftSize);
+        // this.mainChart = lineChart;
     }
 
     private double [] haan_window() {
-        double[] dataOut = new double[FFT_SIZE];
-        double angleConst = 2*Math.PI/(FFT_SIZE -1);
-        for(int i = 0; i < FFT_SIZE; i++) {
+        double[] dataOut = new double[this.fftSize];
+        double angleConst = 2*Math.PI/(this.fftSize -1);
+        for(int i = 0; i < this.fftSize; i++) {
             dataOut[i] = 0.5 * (1 - Math.cos(i*angleConst));
         }
         return dataOut;
@@ -96,50 +102,50 @@ public class FrequencyAnalyzer {
                 inputPos = 0;
             }
             // make sure analyzePos doesn't exceed inputData.length
-            if(inputPos%ANALYZE_SIZE == 0) {
+            if(inputPos%analyzeSize == 0) {
                 analyze();
             }
         }
     }
 
     void analyze() {
-        new Thread(() -> {
+       // new Thread(() -> {
             // Prepare data to analyze
-            fftData = new double[FFT_SIZE];
-            for (int i=analyzePos, j=0; j< FFT_SIZE; i++, j++) {
+            fftData = new double[fftSize];
+            for (int i=analyzePos, j=0; j< fftSize; i++, j++) {
                 int pos = i% inputBuffer.length; // to support round robbin.
                 fftData[j] = inputBuffer[pos]*haanData[j]/Short.MAX_VALUE;
             }
             // Get FFT for the data.
             fft.rdft(1, fftData); // Note: rdft does in-place replacement of fftData
             //Get PowerSpectrum
-            double [] psData = calcPowerSpectrum(fftData);
+            psData = calcPowerSpectrum(fftData);
             //Calculate Auto Correlation from with inverseFFT
             fft.rdft(-1, psData); // Note: rdft does in-place replacement for psData
             // chartData(psData)
             double pitch = -1.0d;
-            Log.d("ANALYZE, ", "power measure " + Math.sqrt(psData[0]));
+            Log.d("ANALYZE", "power measure " + Math.sqrt(psData[0]));
             if (Math.sqrt(psData[0]) >= this.threshold) {
                 pitch = findPitch(psData);
             }
+            pitchBuffer[nPitches++] = pitch;
 
             float cent = FreqToCent(pitch);
             Log.d("ANALYZE", "pitch = " + pitch + " cent: " + cent);
-            pitchBuffer[nPitches++] = cent;
             if(nPitches == pitchBuffer.length)
                 nPitches = 0;
-            chartData(pitchBuffer);
+            // chartData(pitchBuffer);
             // After analysis set analyze position for the next analyze call
-            analyzePos += ANALYZE_SIZE;
+            analyzePos += analyzeSize;
             analyzePos = analyzePos%inputBuffer.length; // don't exceed inputBuffer.length
-        }).start();
+       // }).start();
     }
 
-    public static float FreqToCent(double d) {
-        if (d < 0.0d) {
+    public static float FreqToCent(double freq) {
+        if (freq < 0.0d) {
             return -1.0f;
         }
-        return (float) ((log2(d) - log2C1) * 12.0d * 100.0d);
+        return (float) ((log2(freq) - log2Min) * 12.0d * 100.0d);
     }
 
     double [] calcPowerSpectrum(@NonNull double [] data) {
@@ -165,23 +171,41 @@ public class FrequencyAnalyzer {
     /* Find pitch from ACF */
     private double findPitch(@NonNull double[] acf) {
         double foundPitch = -1.0d;
-
+        /*
         int locFound = getMaxPsLoc(acf);
         double psFound = acf[locFound];
-        //If we never found the pitch or found it but the power is less than 50% then notFound
-        if (locFound == 0 || psFound < acf[0] * 0.5d) { // acf[0] has total power?
+        //If we never found the pitch
+        if (locFound == 0) {
             return -1.0d;
         }
-        double freq = samplingSize/locFound;
+        //found pitch but the power is less than 50%
+        // TODO: commenting below as it fails for pure sine wave where psFound is ~ 20%
+        * if (psFound < acf[0] * 0.5d) {
+            return -1.0d;
+        }*
+        double freq = samplingSize/locFound; */
+        // Step 1: Find freq from ACF
+        double freq = getFreqFromAcf(acf);
+        double myfreq = getFreqFromAcf(acf);
+        if(freq == -1.0d)
+            return -1.0d;
+
         // Step 2: fine tuning freq using FFT
+        double mynewFreq = getRightHarmonic(freq);
         double newFreq = fineTuneFreqWithFft(freq);
         //if((newFreq - freq) != 0.0)
         //    Log.d("ANALYZE", "freq :" + freq + " newFreq : " + newFreq + " diff " + (newFreq/freq));
 
         // Step 3: Fine tune step2 freq using ACF
         double finalFreq = fineTuneStep3(acf, newFreq);
+        double myfinalFreq = fineTuneStep3(acf, mynewFreq);
         // if((finalFreq - newFreq) != 0.0)
            // Log.d("ANALYZE", "newFreq :" + newFreq + " finalFreq : " + finalFreq + " diff " + (finalFreq/newFreq));
+
+        Log.d("TEST", "ACF freq:" + freq + " Harmonic Freq: " + newFreq +
+                " Fine Tune freq: " + finalFreq);
+        Log.d("TEST", "MY ACF freq:" + myfreq + " my Harmonic Freq: " + mynewFreq +
+                " my Fine Tune freq: " + myfinalFreq);
         return finalFreq;
     }
 
@@ -274,12 +298,136 @@ public class FrequencyAnalyzer {
         return newFreq;
     }
 
+    // Step 2: Find the right harmonics
+    // TODO: This function gives 2x values for real harmonium sounds but the other one works
+    double getRightHarmonic(double freq) {
+        // Check upper and lower harmonics till MIN/MAX range
+        double maxVal = -1;
+        double selectedFreq = -1;
+        double fftVal = 0;
+        //for (double testFreq=freq/8; testFreq <= freq*8; testFreq=testFreq + freq/8) {
+        for (int i=1; i<= 8; i++) {
+            double testFreq = i*freq;
+            if (testFreq >= FREQ_MIN && testFreq <= FREQ_MAX) {
+                fftVal = fftNearFreq(testFreq);
+            }
+            if(fftVal > maxVal) {
+                maxVal = fftVal;
+                selectedFreq = testFreq;
+            }
+        }
+        for (int i=8; i<= 2; i++) {
+            double testFreq = freq/i;
+            if (testFreq >= FREQ_MIN && testFreq <= FREQ_MAX) {
+                fftVal = fftNearFreq(testFreq);
+            }
+            if(fftVal > maxVal) {
+                maxVal = fftVal;
+                selectedFreq = testFreq;
+            }
+        }
+        return selectedFreq;
+    }
+    /*
+    double getRightHarmonic(double freq) {
+        double testFreq = freq;
+        double fftVal = fftNearFreq(testFreq);
+        Log.d("TEST", "orig testFreq: " + testFreq + " fftVal " + fftVal);
+
+        double selectedFreq = freq; // default selection
+        double selectedVal = fftVal; // default selection
+        testFreq = freq/2.0d;
+        if (testFreq >= FREQ_MIN) {
+            fftVal = fftNearFreq(testFreq);
+            Log.d("TEST", "1/2 testFreq: " + testFreq + " fftVal " + fftVal);
+            if(fftVal > selectedVal) {
+                selectedVal = fftVal;
+                selectedFreq = testFreq;
+            }
+        }
+        testFreq = freq/3.0d;
+        if (testFreq >= FREQ_MIN) {
+            fftVal = fftNearFreq(testFreq);
+            Log.d("TEST", "1/3 testFreq: " + testFreq + " fftVal " + fftVal);
+            if(fftVal > selectedVal) {
+                selectedVal = fftVal;
+                selectedFreq = testFreq;
+            }
+        }
+        testFreq = freq/4.0d;
+        if (testFreq >= FREQ_MIN) {
+            fftVal = fftNearFreq(testFreq);
+            Log.d("TEST", "1/4 testFreq: " + testFreq + " fftVal " + fftVal);
+            if(fftVal > selectedVal) {
+                selectedVal = fftVal;
+                selectedFreq = testFreq;
+            }
+        }
+        testFreq = freq*2.0d;
+        if (testFreq <= FREQ_MAX) {
+            fftVal = fftNearFreq(testFreq);
+            Log.d("TEST", "2x testFreq: " + testFreq + " fftVal " + fftVal);
+            if(fftVal > selectedVal) {
+                selectedVal = fftVal;
+                selectedFreq = testFreq;
+            }
+        }
+        testFreq = freq*3.0d;
+        if (testFreq <= FREQ_MAX) {
+            fftVal = fftNearFreq(testFreq);
+            Log.d("TEST", "3x testFreq: " + testFreq + " fftVal " + fftVal);
+            if(fftVal > selectedVal) {
+                selectedVal = fftVal;
+                selectedFreq = testFreq;
+            }
+        }
+        testFreq = freq*4.0d;
+        if (testFreq <= FREQ_MAX) {
+            fftVal = fftNearFreq(testFreq);
+            Log.d("TEST", "4x testFreq: " + testFreq + " fftVal " + fftVal);
+            if(fftVal > selectedVal) {
+                selectedVal = fftVal;
+                selectedFreq = testFreq;
+            }
+        }
+        Log.d("TEST", "Selected Harmonic Freq: " + selectedFreq);
+        return selectedFreq;
+    }
+     */
+
     // Find location/index in acf that corresponds to max power between our Min-Max freq range
-    private int getMaxPsLoc(@NonNull double[] acf) {
+   private double mygetFreqFromAcf(@NonNull double[] acf) {
+       // int startLoc = ((int) (this.samplingSize / FREQ_MAX)) - 5;
+       int startLoc = 1;
+       int stopLoc = ((int) (this.samplingSize / FREQ_MIN)) + 10;
+       // int stopLoc = (int) (this.samplingSize/2);
+       double psMaxF = -1;
+       int locFound = 0;
+       for (int loc = startLoc; loc <= stopLoc; loc++) {
+           if (acf[loc] > psMaxF) {
+               psMaxF = acf[loc];
+               locFound = loc;
+           }
+       }
+       //If we never found the pitch
+       if (locFound == 0) {
+           return -1.0d;
+       }
+       //found pitch but the power is less than 50%
+       // TODO: commenting below as it fails for pure sine wave where psFound is ~ 20%
+        /* if (psFound < acf[0] * 0.5d) {
+            return -1.0d;
+        }*/
+       double freq = samplingSize / locFound;
+       return freq;
+    }
+
+    private double getFreqFromAcf(@NonNull double[] acf) {
         int scanLimit = 5; // Look up to these many tranches in acf data
 
         // Initialize max power with MAX freq value we care.
-        int loc = ((int) (this.samplingSize / FREQ_MAX)) - 1; // Wavelength location for max FREQ
+        // int loc = ((int) (this.samplingSize / FREQ_MAX)) - 1; // Wavelength location for max FREQ
+        int loc = 0; //TEST: see if we can detect MAX_FREQ
         double psMaxF = acf[loc];
         // Find PS around MAX Freq
         for (int i = loc + 1; i <= loc + scanLimit; i++) {
@@ -302,7 +450,7 @@ public class FrequencyAnalyzer {
             // Validate if we found ps better than before
             double delta = psNow - psMaxF;
             if (delta < 0.0d && prevDelta > 0.0d && psMaxF > psFound) {
-                // prev ps at loc was the max as we just delta is now negative
+                // prev ps at loc was the max as delta is now negative
                 locFound = loc - 1;
                 psFound = psMaxF;
             }
@@ -311,7 +459,17 @@ public class FrequencyAnalyzer {
                 prevDelta = delta;
             }
         }
-        return locFound;
+        //If we never found the pitch
+        if (locFound == 0) {
+            return -1.0d;
+        }
+        //found pitch but the power is less than 50%
+        // TODO: commenting below as it fails for pure sine wave where psFound is ~ 20%
+        /* if (psFound < acf[0] * 0.5d) {
+            return -1.0d;
+        }*/
+        double freq = samplingSize/locFound;
+        return freq;
     }
 
     private void chartData(float[] psData) {

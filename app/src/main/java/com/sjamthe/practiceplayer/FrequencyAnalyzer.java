@@ -40,8 +40,7 @@ public class FrequencyAnalyzer {
     public static final double FREQ_MAX = FREQ_C8; // Max frequency we want to detect
     public static final double FREQ_MIN = FREQ_C1; // Min frequency we want to detect
 
-    // public static final double SAMPLING_SIZE = 44100.0d; -- moved to a variable.
-
+    static double log2Min = log2(FREQ_MIN);;
     public static double log2(double d) {
         return Math.log(d) / Math.log(2.0d);
     }
@@ -62,7 +61,6 @@ public class FrequencyAnalyzer {
     int analyzeSize;
     double[] fftData; // Stores FFT and iFFT
     double[] psData; // Stores power Spectrum
-    static double log2Min;
 
     public FrequencyAnalyzer(double samplingSize) {
         this.samplingSize = samplingSize;
@@ -75,7 +73,6 @@ public class FrequencyAnalyzer {
         this.inputBuffer = new double[2*(this.fftSize)];
         this.pitchBuffer = new double[(int) (30.0*this.samplingSize/this.analyzeSize)];
         this.centBuffer = new float[this.pitchBuffer.length];
-        log2Min = log2(FREQ_MIN);
         fft = new FFT4g(this.fftSize);
         // this.mainChart = lineChart;
     }
@@ -139,7 +136,8 @@ public class FrequencyAnalyzer {
         if (nPitches == pitchBuffer.length)
             nPitches = 0;
         // chartData(pitchBuffer);
-        fullscreenActivity.fullScreenHandler.post(runUpdateChart);
+        if(fullscreenActivity != null && fullscreenActivity.fullScreenHandler != null)
+            fullscreenActivity.fullScreenHandler.post(runUpdateChart);
         // After analysis set analyze position for the next analyze call
         analyzePos += analyzeSize;
         analyzePos = analyzePos % inputBuffer.length; // don't exceed inputBuffer.length
@@ -149,7 +147,7 @@ public class FrequencyAnalyzer {
         if (freq < 0.0d) {
             return -1.0f;
         }
-        return (float) ((log2(freq) - log2Min) * 12.0d * 100.0d);
+        return (float) ((log2(freq) - log2Min) * 1200.0d); // Each octave = 1200 cents
     }
 
     double [] calcPowerSpectrum(@NonNull double [] data) {

@@ -193,8 +193,8 @@ public class FullscreenActivity extends AppCompatActivity {
         lineChart.getAxisRight().setEnabled(false); // disable right axis, we only need left
         YAxis yAxis = lineChart.getAxisLeft();
         // yAxis.setAxisMaximum(FrequencyAnalyzer.FreqToCent(FrequencyAnalyzer.FREQ_C4));
-        yAxis.setAxisMaximum(4000.0f);
-        yAxis.setAxisMinimum(2000.0f);
+        yAxis.setAxisMaximum(FrequencyAnalyzer.FreqToCent(FrequencyAnalyzer.FREQ_C5));
+        yAxis.setAxisMinimum(FrequencyAnalyzer.FreqToCent(FrequencyAnalyzer.FREQ_C2));
         XAxis xAxis = lineChart.getXAxis();
         xAxis.setAvoidFirstLastClipping(true);
 

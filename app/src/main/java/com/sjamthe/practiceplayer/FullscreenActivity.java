@@ -5,6 +5,7 @@ import static java.lang.Integer.parseInt;
 import android.annotation.SuppressLint;
 import android.content.res.ColorStateList;
 import android.database.Cursor;
+import android.graphics.Color;
 import android.graphics.PorterDuff;
 import android.media.AudioTrack;
 import android.media.MediaMetadataRetriever;
@@ -36,6 +37,7 @@ import com.github.mikephil.charting.data.Entry;
 import com.github.mikephil.charting.data.LineData;
 import com.github.mikephil.charting.data.LineDataSet;
 import com.github.mikephil.charting.interfaces.datasets.ILineDataSet;
+import com.github.mikephil.charting.utils.ColorTemplate;
 import com.google.android.material.button.MaterialButton;
 import com.sjamthe.practiceplayer.databinding.ActivityFullscreenBinding;
 
@@ -184,30 +186,75 @@ public class FullscreenActivity extends AppCompatActivity {
         songSeekBarPosition.setText(secsToTime(positionInSecs) + "/" + secsToTime(durationInSecs));
     }
 
-    void updateChart(float [] dataIn) {
+    void createChart() {
+        lineChart.setTouchEnabled(true);
+        lineChart.getDescription().setEnabled(false); // disable description
+        // enable scaling and dragging
+        lineChart.setDragEnabled(true);
+        lineChart.setScaleEnabled(true);
+        lineChart.setPinchZoom(true); // force pinch zoom along both axis
+        lineChart.setDrawGridBackground(false);
+        // set an alternative background color
+        lineChart.setBackgroundColor(Color.LTGRAY);
 
-        List<Entry> list = new ArrayList<>();
-        for (int j=0; j<dataIn.length; j++) {
-            if(dataIn[j] > 0) {
-                list.add(new Entry((float) j, dataIn[j]));
-            }
-        }
-
-        ArrayList<ILineDataSet> dataSets = new ArrayList<>();
-        LineDataSet lineDataSet = new LineDataSet(list, "FFT data");
-
-        lineDataSet.setDrawCircles(false); // don't draw points
-        LineData lineData = new LineData(lineDataSet);
-        lineChart.setData(lineData);
         lineChart.getAxisRight().setEnabled(false); // disable right axis, we only need left
         YAxis yAxis = lineChart.getAxisLeft();
         yAxis.setAxisMaximum(FrequencyAnalyzer.FreqToCent(FrequencyAnalyzer.FREQ_MAX));
         yAxis.setAxisMinimum(0);
         XAxis xAxis = lineChart.getXAxis();
-        // xAxis.setAxisMaximum(100);
+        xAxis.setAvoidFirstLastClipping(true);
+
         Legend l = lineChart.getLegend();
         l.setEnabled(false);
-        lineChart.invalidate();
+
+        LineData lineData = new LineData();
+        // lineData.setValueTextColor(Color.WHITE);
+
+        // add empty data
+        lineChart.setData(lineData);
+        // limit the number of visible entries
+        // lineChart.setVisibleXRangeMaximum(120);
+    }
+
+    private LineDataSet createSet() {
+        LineDataSet set = new LineDataSet(null, "Dynamic Data");
+        set.setAxisDependency(YAxis.AxisDependency.LEFT);
+        set.setColor(ColorTemplate.getHoloBlue());
+        set.setCircleColor(Color.WHITE);
+        set.setLineWidth(2f);
+        set.setCircleRadius(4f);
+        set.setFillAlpha(65);
+        set.setFillColor(ColorTemplate.getHoloBlue());
+        set.setHighLightColor(Color.rgb(244, 117, 117));
+        set.setValueTextColor(Color.WHITE);
+        set.setValueTextSize(9f);
+        set.setDrawValues(false);
+        return set;
+    }
+
+    void updateChart(float [] dataIn) {
+        LineData lineData = lineChart.getData();
+        if(lineData == null) {
+            createChart();
+            lineData = lineChart.getData();
+        }
+        ILineDataSet set = lineData.getDataSetByIndex(0);
+        if (set == null) {
+            set = createSet();
+            lineData.addDataSet(set);
+        }
+
+        for (int j=0; j<dataIn.length; j++) {
+            if(dataIn[j] > 0) {
+                lineData.addEntry(new Entry(set.getEntryCount(), dataIn[j]), 0);
+                // it may not ber necessary to refresh at every point
+                lineData.notifyDataChanged();
+                // let the chart know it's data has changed
+                lineChart.notifyDataSetChanged();
+                // move to the latest entry
+                lineChart.moveViewToX(lineData.getEntryCount());
+            }
+        }
     }
 
     private final Runnable mHidePart2Runnable = new Runnable() {
@@ -291,13 +338,10 @@ public class FullscreenActivity extends AppCompatActivity {
         songSeekBarPosition = findViewById(R.id.seek_position);
         songSeekBarPosition.setVisibility(View.GONE);
 
-        lineChart = findViewById(R.id.activity_main_linechart); // testing chart
-        lineChart.setTouchEnabled(true);
-        lineChart.getDescription().setEnabled(false); // disable description
-        // enable scaling and dragging
-        lineChart.setDragEnabled(true);
-        lineChart.setScaleEnabled(true);
-        lineChart.setPinchZoom(true); // force pinch zoom along both axis
+        lineChart = findViewById(R.id.activity_main_linechart);
+        createChart();
+        // lineChart.setOnChartValueSelectedListener(this); // can be used to set listener
+        // to listen to events of data selection on chart
         player = new Player(instance);
 
         markerStartPosition = findViewById(R.id.start_position);

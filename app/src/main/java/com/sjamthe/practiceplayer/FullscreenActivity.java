@@ -3,10 +3,8 @@ package com.sjamthe.practiceplayer;
 import static java.lang.Integer.parseInt;
 
 import android.annotation.SuppressLint;
-import android.content.res.ColorStateList;
 import android.database.Cursor;
 import android.graphics.Color;
-import android.graphics.PorterDuff;
 import android.media.AudioTrack;
 import android.media.MediaMetadataRetriever;
 import android.net.Uri;
@@ -15,7 +13,6 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.provider.OpenableColumns;
-import android.util.Log;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.WindowInsets;
@@ -29,7 +26,6 @@ import androidx.appcompat.app.ActionBar;
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.github.mikephil.charting.charts.LineChart;
-import com.github.mikephil.charting.components.Description;
 import com.github.mikephil.charting.components.Legend;
 import com.github.mikephil.charting.components.XAxis;
 import com.github.mikephil.charting.components.YAxis;
@@ -40,9 +36,6 @@ import com.github.mikephil.charting.interfaces.datasets.ILineDataSet;
 import com.github.mikephil.charting.utils.ColorTemplate;
 import com.google.android.material.button.MaterialButton;
 import com.sjamthe.practiceplayer.databinding.ActivityFullscreenBinding;
-
-import java.util.ArrayList;
-import java.util.List;
 
 /**
  * An example full-screen activity that shows and hides the system UI (i.e.
@@ -195,12 +188,13 @@ public class FullscreenActivity extends AppCompatActivity {
         lineChart.setPinchZoom(true); // force pinch zoom along both axis
         lineChart.setDrawGridBackground(false);
         // set an alternative background color
-        lineChart.setBackgroundColor(Color.LTGRAY);
+        // lineChart.setBackgroundColor(Color.LTGRAY);
 
         lineChart.getAxisRight().setEnabled(false); // disable right axis, we only need left
         YAxis yAxis = lineChart.getAxisLeft();
-        yAxis.setAxisMaximum(FrequencyAnalyzer.FreqToCent(FrequencyAnalyzer.FREQ_MAX));
-        yAxis.setAxisMinimum(0);
+        // yAxis.setAxisMaximum(FrequencyAnalyzer.FreqToCent(FrequencyAnalyzer.FREQ_C4));
+        yAxis.setAxisMaximum(4000.0f);
+        yAxis.setAxisMinimum(2000.0f);
         XAxis xAxis = lineChart.getXAxis();
         xAxis.setAvoidFirstLastClipping(true);
 
@@ -213,7 +207,6 @@ public class FullscreenActivity extends AppCompatActivity {
         // add empty data
         lineChart.setData(lineData);
         // limit the number of visible entries
-        // lineChart.setVisibleXRangeMaximum(120);
     }
 
     private LineDataSet createSet() {
@@ -229,10 +222,11 @@ public class FullscreenActivity extends AppCompatActivity {
         set.setValueTextColor(Color.WHITE);
         set.setValueTextSize(9f);
         set.setDrawValues(false);
+        set.setDrawCircles(false); // added to not draw points
         return set;
     }
 
-    void updateChart(float [] dataIn) {
+    void updateChart(float dataIn) {
         LineData lineData = lineChart.getData();
         if(lineData == null) {
             createChart();
@@ -243,18 +237,17 @@ public class FullscreenActivity extends AppCompatActivity {
             set = createSet();
             lineData.addDataSet(set);
         }
+        set.addEntry(new Entry(set.getEntryCount(), dataIn));
 
-        for (int j=0; j<dataIn.length; j++) {
-            if(dataIn[j] > 0) {
-                lineData.addEntry(new Entry(set.getEntryCount(), dataIn[j]), 0);
-                // it may not ber necessary to refresh at every point
-                lineData.notifyDataChanged();
-                // let the chart know it's data has changed
-                lineChart.notifyDataSetChanged();
-                // move to the latest entry
-                lineChart.moveViewToX(lineData.getEntryCount());
-            }
-        }
+        // it may not ber necessary to refresh at every point
+        lineData.notifyDataChanged();
+        // let the chart know it's data has changed
+        lineChart.notifyDataSetChanged();
+        // limit the number of visible entries
+        lineChart.setVisibleXRangeMaximum(120);
+
+        // move to the latest entry
+        lineChart.moveViewToX(lineData.getEntryCount()); // no lines if disabled
     }
 
     private final Runnable mHidePart2Runnable = new Runnable() {

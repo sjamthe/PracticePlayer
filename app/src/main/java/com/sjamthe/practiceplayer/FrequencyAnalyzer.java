@@ -30,7 +30,12 @@ public class FrequencyAnalyzer {
     public static final double SEMITONE_INTERVAL = Math.pow(2.0d, 1.0d/12.0d);
     // Example:calculate any freq like C3 will be 12 (which is A2) +3 semitones from A1 or 130.8Hz
     public static final double FREQ_C3 = 2*FREQ_A1*Math.pow(SEMITONE_INTERVAL,3.0d); // 130.8Hz
+    public static final double FREQ_C2 = FREQ_C3*Math.pow(2.0d, -1.0d); // 32.7Hz
     public static final double FREQ_C1 = FREQ_C3*Math.pow(2.0d, -2.0d); // 32.7Hz
+    public static final double FREQ_C4 = FREQ_C3*Math.pow(2.0d, 1.0d); // 32.7Hz
+    public static final double FREQ_C5 = FREQ_C3*Math.pow(2.0d, 2.0d); // 32.7Hz
+    public static final double FREQ_C6 = FREQ_C3*Math.pow(2.0d, 3.0d); // 32.7Hz
+    public static final double FREQ_C7 = FREQ_C3*Math.pow(2.0d, 4.0d); // 32.7Hz
     public static final double FREQ_C8 = FREQ_C3*Math.pow(2.0d, 5.0d); // 4186Hz or (2^5)*C3
     public static final double FREQ_MAX = FREQ_C8; // Max frequency we want to detect
     public static final double FREQ_MIN = FREQ_C1; // Min frequency we want to detect
@@ -45,6 +50,7 @@ public class FrequencyAnalyzer {
     double [] inputBuffer;
     double [] pitchBuffer; // how many pitches do we store? one pitch per analyze call.
     float [] centBuffer; // Stores Pitch converted to log2 scale and relative to FREQ_MIN
+    float lastCent;
     private int nPitches = 0;
 
     int inputPos = 0;
@@ -77,7 +83,7 @@ public class FrequencyAnalyzer {
     private final Runnable runUpdateChart = new Runnable() {
         @Override
         public void run() {
-            fullscreenActivity.updateChart(centBuffer);
+            fullscreenActivity.updateChart(lastCent);
         }
     };
 
@@ -126,10 +132,10 @@ public class FrequencyAnalyzer {
             pitch = findPitch(psData);
         }
         pitchBuffer[nPitches] = pitch;
-        float cent = FreqToCent(pitch);
-        centBuffer[nPitches] = cent;
+        lastCent = FreqToCent(pitch);
+        centBuffer[nPitches] = lastCent;
         nPitches++;
-        Log.d("ANALYZE", "pitch = " + pitch + " cent: " + cent);
+        Log.d("ANALYZE", "pitch = " + pitch + " cent: " + lastCent);
         if (nPitches == pitchBuffer.length)
             nPitches = 0;
         // chartData(pitchBuffer);

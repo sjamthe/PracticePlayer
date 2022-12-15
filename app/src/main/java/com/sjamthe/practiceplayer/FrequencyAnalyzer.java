@@ -4,18 +4,6 @@ import android.util.Log;
 
 import androidx.annotation.NonNull;
 
-import com.github.mikephil.charting.charts.LineChart;
-import com.github.mikephil.charting.components.Legend;
-import com.github.mikephil.charting.components.XAxis;
-import com.github.mikephil.charting.components.YAxis;
-import com.github.mikephil.charting.data.Entry;
-import com.github.mikephil.charting.data.LineData;
-import com.github.mikephil.charting.data.LineDataSet;
-import com.github.mikephil.charting.interfaces.datasets.ILineDataSet;
-
-import java.util.ArrayList;
-import java.util.List;
-
 /*
 Find Pitch using ACF (Auto Correlation Function
 Ref:
@@ -34,7 +22,8 @@ https://github.com/cuthbertLab/music21/blob/master/music21/analysis/discrete.py
  */
 
 public class FrequencyAnalyzer {
-    LineChart mainChart;
+    FullscreenActivity fullscreenActivity;
+
     public static final double FREQ_A1 = 55.0d;
     static final double VOLUME_THRESHOLD = 5.0d;
     static final int ANALYZE_SAMPLES_PER_SECOND = 15; // can be a variable
@@ -55,6 +44,7 @@ public class FrequencyAnalyzer {
     double [] haanData;
     double [] inputBuffer;
     double [] pitchBuffer; // how many pitches do we store? one pitch per analyze call.
+    float [] centBuffer; // Stores Pitch converted to log2 scale and relative to FREQ_MIN
     private int nPitches = 0;
 
     int inputPos = 0;
@@ -78,10 +68,18 @@ public class FrequencyAnalyzer {
         haanData = haan_window();
         this.inputBuffer = new double[2*(this.fftSize)];
         this.pitchBuffer = new double[(int) (30.0*this.samplingSize/this.analyzeSize)];
+        this.centBuffer = new float[this.pitchBuffer.length];
         log2Min = log2(FREQ_MIN);
         fft = new FFT4g(this.fftSize);
         // this.mainChart = lineChart;
     }
+
+    private final Runnable runUpdateChart = new Runnable() {
+        @Override
+        public void run() {
+            fullscreenActivity.updateChart(centBuffer);
+        }
+    };
 
     private double [] haan_window() {
         double[] dataOut = new double[this.fftSize];
@@ -109,36 +107,36 @@ public class FrequencyAnalyzer {
     }
 
     void analyze() {
-       // new Thread(() -> {
-            // Prepare data to analyze
-            fftData = new double[fftSize];
-            for (int i=analyzePos, j=0; j< fftSize; i++, j++) {
-                int pos = i% inputBuffer.length; // to support round robbin.
-                fftData[j] = inputBuffer[pos]*haanData[j]/Short.MAX_VALUE;
-            }
-            // Get FFT for the data.
-            fft.rdft(1, fftData); // Note: rdft does in-place replacement of fftData
-            //Get PowerSpectrum
-            psData = calcPowerSpectrum(fftData);
-            //Calculate Auto Correlation from with inverseFFT
-            fft.rdft(-1, psData); // Note: rdft does in-place replacement for psData
-            // chartData(psData)
-            double pitch = -1.0d;
-            Log.d("ANALYZE", "power measure " + Math.sqrt(psData[0]));
-            if (Math.sqrt(psData[0]) >= this.threshold) {
-                pitch = findPitch(psData);
-            }
-            pitchBuffer[nPitches++] = pitch;
-
-            float cent = FreqToCent(pitch);
-            Log.d("ANALYZE", "pitch = " + pitch + " cent: " + cent);
-            if(nPitches == pitchBuffer.length)
-                nPitches = 0;
-            // chartData(pitchBuffer);
-            // After analysis set analyze position for the next analyze call
-            analyzePos += analyzeSize;
-            analyzePos = analyzePos%inputBuffer.length; // don't exceed inputBuffer.length
-       // }).start();
+        // Prepare data to analyze
+        fftData = new double[fftSize];
+        for (int i = analyzePos, j = 0; j < fftSize; i++, j++) {
+            int pos = i % inputBuffer.length; // to support round robbin.
+            fftData[j] = inputBuffer[pos] * haanData[j] / Short.MAX_VALUE;
+        }
+        // Get FFT for the data.
+        fft.rdft(1, fftData); // Note: rdft does in-place replacement of fftData
+        //Get PowerSpectrum
+        psData = calcPowerSpectrum(fftData);
+        //Calculate Auto Correlation from with inverseFFT
+        fft.rdft(-1, psData); // Note: rdft does in-place replacement for psData
+        // chartData(psData)
+        double pitch = -1.0d;
+        Log.d("ANALYZE", "power measure " + Math.sqrt(psData[0]));
+        if (Math.sqrt(psData[0]) >= this.threshold) {
+            pitch = findPitch(psData);
+        }
+        pitchBuffer[nPitches] = pitch;
+        float cent = FreqToCent(pitch);
+        centBuffer[nPitches] = cent;
+        nPitches++;
+        Log.d("ANALYZE", "pitch = " + pitch + " cent: " + cent);
+        if (nPitches == pitchBuffer.length)
+            nPitches = 0;
+        // chartData(pitchBuffer);
+        fullscreenActivity.fullScreenHandler.post(runUpdateChart);
+        // After analysis set analyze position for the next analyze call
+        analyzePos += analyzeSize;
+        analyzePos = analyzePos % inputBuffer.length; // don't exceed inputBuffer.length
     }
 
     public static float FreqToCent(double freq) {
@@ -328,6 +326,7 @@ public class FrequencyAnalyzer {
         }
         return selectedFreq;
     }
+
     /*
     double getRightHarmonic(double freq) {
         double testFreq = freq;
@@ -471,7 +470,7 @@ public class FrequencyAnalyzer {
         double freq = samplingSize/locFound;
         return freq;
     }
-
+/*
     private void chartData(float[] psData) {
         List<Entry> list = new ArrayList<>();
 
@@ -497,4 +496,5 @@ public class FrequencyAnalyzer {
         l.setEnabled(false);
         mainChart.invalidate();
     }
+ */
 } // FrequencyAnalyzer class

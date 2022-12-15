@@ -29,8 +29,18 @@ import androidx.appcompat.app.AppCompatActivity;
 
 import com.github.mikephil.charting.charts.LineChart;
 import com.github.mikephil.charting.components.Description;
+import com.github.mikephil.charting.components.Legend;
+import com.github.mikephil.charting.components.XAxis;
+import com.github.mikephil.charting.components.YAxis;
+import com.github.mikephil.charting.data.Entry;
+import com.github.mikephil.charting.data.LineData;
+import com.github.mikephil.charting.data.LineDataSet;
+import com.github.mikephil.charting.interfaces.datasets.ILineDataSet;
 import com.google.android.material.button.MaterialButton;
 import com.sjamthe.practiceplayer.databinding.ActivityFullscreenBinding;
+
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * An example full-screen activity that shows and hides the system UI (i.e.
@@ -166,12 +176,38 @@ public class FullscreenActivity extends AppCompatActivity {
         return text;
     }
 
-    // Ideally this should run in main thread and not called from another thread
+    // This now runs in main thread with the help of fullScreenHandler
     void updateSeekBar(long presentationTimeUs) {
         songSeekBar.setProgress((int) (presentationTimeUs / 1000f));
 
         int positionInSecs = Math.round(presentationTimeUs/1000000f);
         songSeekBarPosition.setText(secsToTime(positionInSecs) + "/" + secsToTime(durationInSecs));
+    }
+
+    void updateChart(float [] dataIn) {
+
+        List<Entry> list = new ArrayList<>();
+        for (int j=0; j<dataIn.length; j++) {
+            if(dataIn[j] > 0) {
+                list.add(new Entry((float) j, dataIn[j]));
+            }
+        }
+
+        ArrayList<ILineDataSet> dataSets = new ArrayList<>();
+        LineDataSet lineDataSet = new LineDataSet(list, "FFT data");
+
+        lineDataSet.setDrawCircles(false); // don't draw points
+        LineData lineData = new LineData(lineDataSet);
+        lineChart.setData(lineData);
+        lineChart.getAxisRight().setEnabled(false); // disable right axis, we only need left
+        YAxis yAxis = lineChart.getAxisLeft();
+        yAxis.setAxisMaximum(FrequencyAnalyzer.FreqToCent(FrequencyAnalyzer.FREQ_MAX));
+        yAxis.setAxisMinimum(0);
+        XAxis xAxis = lineChart.getXAxis();
+        // xAxis.setAxisMaximum(100);
+        Legend l = lineChart.getLegend();
+        l.setEnabled(false);
+        lineChart.invalidate();
     }
 
     private final Runnable mHidePart2Runnable = new Runnable() {

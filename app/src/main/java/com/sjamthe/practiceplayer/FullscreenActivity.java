@@ -212,17 +212,17 @@ public class FullscreenActivity extends AppCompatActivity {
     private LineDataSet createSet() {
         LineDataSet set = new LineDataSet(null, "Dynamic Data");
         set.setAxisDependency(YAxis.AxisDependency.LEFT);
-        set.setColor(ColorTemplate.getHoloBlue());
+        set.setColor(R.color.light_blue_600); // unable to make line invisible
+        // set.setFillColor(R.color.light_blue_A200);
         set.setCircleColor(Color.WHITE);
-        set.setLineWidth(2f);
-        set.setCircleRadius(4f);
-        set.setFillAlpha(65);
-        set.setFillColor(ColorTemplate.getHoloBlue());
+        set.setLineWidth(.2f); // .2f is almost invisible
+        set.setCircleRadius(2f);
+        set.setFillAlpha(65); // doesn't make any change ?
         set.setHighLightColor(Color.rgb(244, 117, 117));
         set.setValueTextColor(Color.WHITE);
-        set.setValueTextSize(9f);
+        // set.setValueTextSize(9f);
         set.setDrawValues(false);
-        set.setDrawCircles(false); // added to not draw points
+        //set.setDrawCircles(false); // added to not draw points
         return set;
     }
 

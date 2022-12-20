@@ -9,22 +9,11 @@ import java.util.OptionalDouble;
 
 public class FrequencyAnalyzerTest {
 
-    public static final double SEMITONE_INTERVAL = Math.pow(2.0d, 1.0d/12.0d);
     public static final double SAMPLING_SIZE = 44100.0d;
-    private FrequencyAnalyzer analyzer;
-
-    public static double log2(double d) {
-        return Math.log(d) / Math.log(2.0d);
-    }
-
-    @Before
-    public void setUp() {
-        analyzer = new FrequencyAnalyzer(SAMPLING_SIZE);
-    }
 
     private static short[] generateSineWaveFreq(double frequencyOfSignal, int size) {
         short[] sin = new short[size];
-        double samplingInterval = (double) (SAMPLING_SIZE / frequencyOfSignal);
+        double samplingInterval =  SAMPLING_SIZE / frequencyOfSignal;
         for (int i = 0; i < size; i++) {
             double angle = (2.0 * Math.PI) * (i / samplingInterval);
             sin[i] = (short) (Math.sin(angle)*Short.MAX_VALUE);
@@ -33,27 +22,54 @@ public class FrequencyAnalyzerTest {
     }
 
     @Test
-    public void testSingleFreqSineWave() {
-        //for (int i=7,j=0; i>=1; i--, j++) {
-        for (int i=0,j=0; i<=7; i++, j++) {
+    public void testAllCSineWaves() {
+        double totalErrors = 0;
+        int count=0;
+        for (int i=1; i<7; i++) {
             FrequencyAnalyzer analyzer = new FrequencyAnalyzer(SAMPLING_SIZE);
             double testPitch = Math.pow(2, i) * analyzer.FREQ_C1;
-            System.out.println("Testing Freq: " + testPitch);
+            short[] signal = generateSineWaveFreq(testPitch, analyzer.analyzeSize);
+            analyzer.addData(signal);
+            double detectedPitch = analyzer.pitchBuffer[0];
+            double errorPct = Math.abs(analyzer.FreqToCent(testPitch)
+                    - analyzer.FreqToCent(detectedPitch)) / analyzer.FreqToCent(testPitch)*100;
+            System.out.printf("Error: %.2f, InputFreq: %.1f, testPitch %.1f\n",
+                    errorPct, testPitch,detectedPitch);
+            totalErrors += errorPct;
+            count++;
+        }
+        Assert.assertTrue(totalErrors/count <= 1);
+    }
+
+    @Test
+    public void testAllPitchesInSine() {
+        double totalErrors = 0;
+        int count=0;
+        double testPitch = FrequencyAnalyzer.FREQ_C2;
+        while(testPitch <= FrequencyAnalyzer.FREQ_C7) {
+            FrequencyAnalyzer analyzer = new FrequencyAnalyzer(SAMPLING_SIZE);
             short[] signal = generateSineWaveFreq(testPitch, analyzer.analyzeSize);
             analyzer.addData(signal);
             //printToCSV(analyzer.fftData);
             // printToCSV(analyzer.psData);
             double detectedPitch = analyzer.pitchBuffer[0];
+            // double errorPct = Math.abs(testPitch - detectedPitch)/(testPitch+1)*100;
             double errorPct = Math.abs(analyzer.FreqToCent(testPitch)
                     - analyzer.FreqToCent(detectedPitch)) / analyzer.FreqToCent(testPitch)*100;
-            System.out.println("Error: " + errorPct + " InputFreq: " + testPitch + " OUTPUT: " + detectedPitch);
+            totalErrors += errorPct;
+            System.out.printf("Error: %.2f, InputFreq: %.1f, testPitch %.1f\n",
+                    errorPct, testPitch,detectedPitch);
+
+            testPitch *= FrequencyAnalyzer.SEMITONE_INTERVAL;
+            count++;
         }
+        Assert.assertTrue(totalErrors/count <= 1);
     }
 
     @Test
-    public void testMaxFreq() {
+    public void testOneFreq() {
         FrequencyAnalyzer analyzer = new FrequencyAnalyzer(SAMPLING_SIZE);
-        double testPitch = analyzer.FREQ_MAX+200;
+        double testPitch = FrequencyAnalyzer.FREQ_C3;
         System.out.println("Testing Freq: " + testPitch);
         short[] signal = generateSineWaveFreq(testPitch, analyzer.analyzeSize);
         analyzer.addData(signal);
@@ -62,8 +78,10 @@ public class FrequencyAnalyzerTest {
         double detectedPitch = analyzer.pitchBuffer[0];
         double errorPct = Math.abs(analyzer.FreqToCent(testPitch)
                 - analyzer.FreqToCent(detectedPitch)) / analyzer.FreqToCent(testPitch)*100;
-        System.out.println("Error: " + errorPct + " InputFreq: " + testPitch + " OUTPUT: " + detectedPitch);
+        System.out.printf("Error: %.2f, InputFreq: %.1f, testPitch %.1f\n",
+                errorPct, testPitch,detectedPitch);
 
+        Assert.assertTrue(errorPct < 1);
     }
 
     private void printToCSV(short[] signal) {

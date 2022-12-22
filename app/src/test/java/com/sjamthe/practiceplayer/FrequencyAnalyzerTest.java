@@ -60,6 +60,7 @@ public class FrequencyAnalyzerTest {
             System.out.printf("Error: %.2f, InputFreq: %.1f, testPitch %.1f\n",
                     errorPct, testPitch,detectedPitch);
 
+            // Assert.assertTrue(errorPct <= 2);
             testPitch *= FrequencyAnalyzer.SEMITONE_INTERVAL;
             count++;
         }
@@ -69,7 +70,7 @@ public class FrequencyAnalyzerTest {
     @Test
     public void testOneFreq() {
         FrequencyAnalyzer analyzer = new FrequencyAnalyzer(SAMPLING_SIZE);
-        double testPitch = FrequencyAnalyzer.FREQ_C3;
+        double testPitch = 1661.2; //FrequencyAnalyzer.FREQ_C3;
         System.out.println("Testing Freq: " + testPitch);
         short[] signal = generateSineWaveFreq(testPitch, analyzer.analyzeSize);
         analyzer.addData(signal);

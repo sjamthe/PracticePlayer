@@ -31,8 +31,7 @@ https://interactiveaudiolab.github.io/teaching/eecs352stuff/CS352-Single-Pitch-D
 https://ccrma.stanford.edu/~pdelac/PitchDetection/icmc01-pitch.pdf
 https://www.ijert.org/research/robust-pitch-detection-algorithm-of-pathological-speech-based-on-acf-and-amdf-IJERTV4IS050380.pdf
 https://www.dafx.de/paper-archive/2019/DAFx2019_paper_54.pdf
-https://gist.github.com/ajkluber/f293eefba2f946f47bfa
-https://otexts.com/fpp2/autocorrelation.html
+https://otexts.com/fpp2/autocorrelation.html -1
 https://www.ymec.com/hp/signal2/acf.htm
 
 Hanning window is used to smooth out the signal and improve its frequency response.
@@ -45,9 +44,9 @@ public class FrequencyAnalyzer {
     FullscreenActivity fullscreenActivity;
 
     public static final double FREQ_A1 = 55.0d;
-    static final double VOLUME_THRESHOLD = 5.0d;
+    static final double VOLUME_THRESHOLD = 75.0d; // 5.0 is default.
     static final int ANALYZE_SAMPLES_PER_SECOND = 15; // can be a variable
-    public static final double SEMITONE_INTERVAL = Math.pow(2.0d, 1.0d/12.0d);
+    public static final double SEMITONE_INTERVAL = Math.pow(2.0d, 1.0d/12.0d); // 1.05946
     // Example:calculate any freq like C3 will be 12 (which is A2) +3 semitones from A1 or 130.8Hz
     public static final double FREQ_C3 = 2*FREQ_A1*Math.pow(SEMITONE_INTERVAL,3.0d); // 130.8Hz
     public static final double FREQ_C2 = FREQ_C3*Math.pow(2.0d, -1.0d);
@@ -109,6 +108,18 @@ public class FrequencyAnalyzer {
         System.out.println();
     }
 
+    private double sumSignal(double[] data) {
+        double sum = 0;
+        if(data.length < 1) {
+            return sum;
+        }
+
+        for (int i=0; i< data.length; i++) {
+            sum += Math.abs(data[i]);
+        }
+        return sum;
+    }
+
     public FrequencyAnalyzer(double samplingSize) {
         this.samplingSize = samplingSize;
         this.fftSize = (int) Math.pow(2.0d,
@@ -158,36 +169,38 @@ public class FrequencyAnalyzer {
 
     void analyze() {
         // Prepare data to analyze
-        // fftData = new double[fftSize];
-        signal = new double[fftSize];
-        for (int i = analyzePos, j = 0; j < fftSize; i++, j++) {
-            int pos = i % inputBuffer.length; // to support round robbin.
-            signal[j] = inputBuffer[pos] * haanData[j] / Short.MAX_VALUE;
-        }
-        fftData = signal.clone();
-        // Get FFT for the data.
-        fft.rdft(1, fftData); // Note: rdft does in-place replacement of fftData
-        //Get PowerSpectrum
-        psData = calcPowerSpectrum(fftData);
-        acfData = psData.clone();
-        //Calculate Auto Correlation from with inverseFFT
-        fft.rdft(-1, acfData); // Note: rdft does in-place replacement for acfData
-        normalizeACF(); //Normalize ACF data
-        // chartData(acfData)
-        // Log.d("ANALYZE", "power measure " + Math.sqrt(acfData[0]));
         double pitch = -1;
-        if (Math.sqrt(acfData[0]) >= this.threshold) {
-            pitch = findPitch();
+        if(sumSignal(inputBuffer) >= this.threshold) {
+            signal = new double[fftSize];
+            for (int i = analyzePos, j = 0; j < fftSize; i++, j++) {
+                int pos = i % inputBuffer.length; // to support round robbin.
+                signal[j] = inputBuffer[pos] * haanData[j] / Short.MAX_VALUE;
+            }
+            fftData = signal.clone();
+            // Get FFT for the data.
+            fft.rdft(1, fftData); // Note: rdft does in-place replacement of fftData
+            //Get PowerSpectrum
+            psData = calcPowerSpectrum(fftData);
+            acfData = psData.clone();
+            //Calculate Auto Correlation from with inverseFFT
+            fft.rdft(-1, acfData); // Note: rdft does in-place replacement for acfData
+            normalizeACF(); //Normalize ACF data
+
+            if (Math.sqrt(acfData[0]) >= this.threshold) {
+                pitch = findPitch();
+            }
         }
+        // Log.d("THRESHOLD", "acf power measure:" + Math.sqrt(acfData[0])
+        // + " signal power:" + sumSignal(signal));
+
+
         pitchBuffer[nPitches] = pitch;
         lastCent = FreqToCent(pitch);
         centBuffer[nPitches] = lastCent;
         nPitches++;
         if (nPitches == pitchBuffer.length)
             nPitches = 0;
-        // Log.d("ANALYZE", "pitch = " + pitch + " cent: " + lastCent);
 
-        // chartData(pitchBuffer);
         if(fullscreenActivity != null && fullscreenActivity.fullScreenHandler != null)
             fullscreenActivity.fullScreenHandler.post(runUpdateChart);
         // After analysis set analyze position for the next analyze call
@@ -254,44 +267,60 @@ public class FrequencyAnalyzer {
     // If ACF is no above .90 we select freq from freqs that is closet to last two freq.
     private double selectCorrectPitch(double[] freqs) {
         double[] acfs = new double[freqs.length];
+        double totalAcf = 0;
         for (int i=0; i<freqs.length; i++) {
             acfs[i] = getAcfFromFreq(freqs[i]);
+            totalAcf += acfs[i];
         }
-        if ((acfs[0] > 0.9 && acfs[1] <= 0.9) || nPitches < 2) {
-            // Choice is clear
+        if ((acfs[0]/totalAcf > 3/acfs.length && acfs[1]/totalAcf < 4/acfs.length)
+                || nPitches < 2) {
+            // Choice is clear or is it?
             return freqs[0];
         }
+
         // Else compare with past two pitches in pitchBuffer
         // If the last two frequencies are almost same (in same semitone) we prefer current
         // frequency also closest of all the harmonics.
-        if (Math.abs(pitchBuffer[nPitches-2] - pitchBuffer[nPitches-1]) < SEMITONE_INTERVAL) {
-            for (int i=0; i< freqs.length; i++) {
-                if (Math.abs(pitchBuffer[nPitches-1] - freqs[i]) < SEMITONE_INTERVAL) {
-                    return freqs[i];
+        if(pitchBuffer[nPitches-1] > 0) {
+            if (Math.abs(pitchBuffer[nPitches - 2] - pitchBuffer[nPitches - 1]) <
+                    (SEMITONE_INTERVAL - 1) * pitchBuffer[nPitches - 1]) {
+                for (int i = 0; i < freqs.length; i++) {
+                    if (Math.abs(pitchBuffer[nPitches - 1] - freqs[i]) <
+                            (SEMITONE_INTERVAL - 1) * pitchBuffer[nPitches - 1]) {
+                        return freqs[i];
+                    }
                 }
             }
-        }
-        // If last two frequencies are not same, try the last one.
-        for (int i=0; i< freqs.length; i++) {
-            if (Math.abs(pitchBuffer[nPitches-1] - freqs[i]) < SEMITONE_INTERVAL) {
-                return freqs[i];
+            /* If last two frequencies are not same, try the last one.
+            for (int i = 0; i < freqs.length; i++) {
+                if (Math.abs(pitchBuffer[nPitches - 1] - freqs[i]) <
+                        (SEMITONE_INTERVAL - 1) * pitchBuffer[nPitches - 1]) {
+                    return freqs[i];
+                }
+            }*/ // commented as this case covered in general case below.
+
+            // Select harmonic that is closest to last pitch
+            double minRatio = 5;
+            double foundPitch = -1;
+            for (int i=0; i< freqs.length; i++) {
+                double ratio = pitchBuffer[nPitches-1]/freqs[i];
+                if (ratio > 1 && ratio < minRatio) {
+                    minRatio = ratio;
+                    foundPitch = freqs[i];
+                } else if (ratio < 1 && 1/ratio < minRatio) {
+                    minRatio = 1/ratio;
+                    foundPitch = freqs[i];
+                }
+            }
+            if (foundPitch > 0) {
+                return foundPitch;
             }
         }
-        // Select harmonic that is closest to last pitch
-        double minRatio = 5;
-        double foundPitch = -1;
-        for (int i=0; i< freqs.length; i++) {
-            double ratio = pitchBuffer[nPitches-1]/freqs[i];
-            if (ratio > 1 && ratio < minRatio) {
-                minRatio = ratio;
-                foundPitch = freqs[i];
-            } else if (ratio < 1 && 1/ratio < minRatio) {
-                minRatio = 1/ratio;
-                foundPitch = freqs[i];
-            }
-        }
-        if (foundPitch > 0) {
-            return foundPitch;
+        // HPS - if second freq is 1/2 first and has amplitude above average select that
+        long freqRatio = Math.round(freqs[0] / freqs[1]);
+        if(freqRatio == 2 && acfs[1] / totalAcf > 1/acfs.length) {
+            // freqs[0] is a strong harmonic of freqs[1].
+            return freqs[1];
         }
         return freqs[0];
     }

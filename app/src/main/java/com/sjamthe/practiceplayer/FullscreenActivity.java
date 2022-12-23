@@ -216,7 +216,7 @@ public class FullscreenActivity extends AppCompatActivity {
         // set.setFillColor(R.color.light_blue_A200);
         set.setCircleColor(Color.WHITE);
         set.setLineWidth(.2f); // .2f is almost invisible
-        set.setCircleRadius(1.2f);
+        set.setCircleRadius(1.3f);
         set.setFillAlpha(65); // doesn't make any change ?
         set.setHighLightColor(Color.rgb(244, 117, 117));
         set.setValueTextColor(Color.WHITE);

@@ -6,6 +6,7 @@ import androidx.annotation.NonNull;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.OptionalDouble;
 
 /*
@@ -194,12 +195,12 @@ public class FrequencyAnalyzer {
         // + " signal power:" + sumSignal(signal));
 
 
-        pitchBuffer[nPitches] = pitch;
+        pitchBuffer[nPitches%pitchBuffer.length] = pitch;
         lastCent = FreqToCent(pitch);
-        centBuffer[nPitches] = lastCent;
+        centBuffer[nPitches%pitchBuffer.length] = lastCent;
         nPitches++;
-        if (nPitches == pitchBuffer.length)
-            nPitches = 0;
+        /* if (nPitches == pitchBuffer.length)
+            nPitches = 0;*/
 
         if(fullscreenActivity != null && fullscreenActivity.fullScreenHandler != null)
             fullscreenActivity.fullScreenHandler.post(runUpdateChart);
@@ -259,70 +260,116 @@ public class FrequencyAnalyzer {
 
         // Step 3: Fine tune step2 freq using ACF
         double finalFreq = fineTuneStep3(selectedFreq);
-        Log.d("FINAL", "freqs[0]:" + freqs[0] + " selectedFreq:" + selectedFreq +
+        Log.d("FINAL", nPitches + ": power:" + Math.sqrt(acfData[0]) +
+                ": freqs[0]:" + freqs[0] + " selectedFreq:" + selectedFreq +
                 " finalFreq:" + finalFreq);
         return finalFreq;
     }
 
     // If ACF is no above .90 we select freq from freqs that is closet to last two freq.
     private double selectCorrectPitch(double[] freqs) {
-        double[] acfs = new double[freqs.length];
-        double totalAcf = 0;
-        for (int i=0; i<freqs.length; i++) {
-            acfs[i] = getAcfFromFreq(freqs[i]);
-            totalAcf += acfs[i];
-        }
-        if ((acfs[0]/totalAcf > 3/acfs.length && acfs[1]/totalAcf < 4/acfs.length)
-                || nPitches < 2) {
-            // Choice is clear or is it?
-            return freqs[0];
+
+        if (nPitches < 2) {
+            return getPitchFromHPS(freqs);
         }
 
         // Else compare with past two pitches in pitchBuffer
         // If the last two frequencies are almost same (in same semitone) we prefer current
         // frequency also closest of all the harmonics.
-        if(pitchBuffer[nPitches-1] > 0) {
-            if (Math.abs(pitchBuffer[nPitches - 2] - pitchBuffer[nPitches - 1]) <
-                    (SEMITONE_INTERVAL - 1) * pitchBuffer[nPitches - 1]) {
+        double prevPitch = pitchBuffer[(nPitches -1) % pitchBuffer.length];
+        double prevPrevPitch =  pitchBuffer[(nPitches -2) % pitchBuffer.length];
+
+        // We have some history to compare with.
+        if (prevPitch > 0 || prevPrevPitch > 0) {
+            // If both prev pitches are same
+            if (Math.abs(prevPrevPitch - prevPitch) <
+                    (SEMITONE_INTERVAL - 1) * prevPitch) {
                 for (int i = 0; i < freqs.length; i++) {
-                    if (Math.abs(pitchBuffer[nPitches - 1] - freqs[i]) <
-                            (SEMITONE_INTERVAL - 1) * pitchBuffer[nPitches - 1]) {
+                    if (Math.abs(prevPitch - freqs[i]) <
+                            (SEMITONE_INTERVAL - 1) * prevPitch) {
                         return freqs[i];
                     }
                 }
             }
-            /* If last two frequencies are not same, try the last one.
-            for (int i = 0; i < freqs.length; i++) {
-                if (Math.abs(pitchBuffer[nPitches - 1] - freqs[i]) <
-                        (SEMITONE_INTERVAL - 1) * pitchBuffer[nPitches - 1]) {
-                    return freqs[i];
-                }
-            }*/ // commented as this case covered in general case below.
-
-            // Select harmonic that is closest to last pitch
             double minRatio = 5;
             double foundPitch = -1;
-            for (int i=0; i< freqs.length; i++) {
-                double ratio = pitchBuffer[nPitches-1]/freqs[i];
-                if (ratio > 1 && ratio < minRatio) {
-                    minRatio = ratio;
-                    foundPitch = freqs[i];
-                } else if (ratio < 1 && 1/ratio < minRatio) {
-                    minRatio = 1/ratio;
-                    foundPitch = freqs[i];
+            if (prevPitch < 0 && prevPrevPitch > 0) {
+                // Select harmonic that is closest to last to last pitch
+                for (int i = 0; i < freqs.length; i++) {
+                    double ratio = prevPrevPitch / freqs[i];
+                    if (ratio > 1 && ratio < minRatio) {
+                        minRatio = ratio;
+                        foundPitch = freqs[i];
+                    } else if (ratio < 1 && 1/ratio < minRatio) {
+                        minRatio = 1/ratio;
+                        foundPitch = freqs[i];
+                    }
+                }
+            } else {
+                // Select harmonic that is closest to last pitch
+                for (int i = 0; i < freqs.length; i++) {
+                    double ratio = prevPitch/freqs[i];
+                    if (ratio > 1 && ratio < minRatio) {
+                        minRatio = ratio;
+                        foundPitch = freqs[i];
+                    } else if (ratio < 1 && 1/ratio < minRatio) {
+                        minRatio = 1/ratio;
+                        foundPitch = freqs[i];
+                    }
                 }
             }
             if (foundPitch > 0) {
                 return foundPitch;
             }
         }
-        // HPS - if second freq is 1/2 first and has amplitude above average select that
-        long freqRatio = Math.round(freqs[0] / freqs[1]);
-        if(freqRatio == 2 && acfs[1] / totalAcf > 1/acfs.length) {
-            // freqs[0] is a strong harmonic of freqs[1].
-            return freqs[1];
+        // return freqs[0];
+        return getPitchFromHPS(freqs);
+    }
+
+    // Look at harmonics of freqs[0]. Add all up with HPS and select one with max amp
+    // Always boosting freqs[1]
+    private double getPitchFromHPS(double[] freqs) {
+
+        double[] acfs = new double[freqs.length];
+        double totalAcf = 0;
+        for (int i=0; i<freqs.length; i++) {
+            if (freqs[i] > 0) {
+                acfs[i] = getAcfFromFreq(freqs[i]);
+                totalAcf += acfs[i];
+            }
         }
-        return freqs[0];
+        // Calculate new ACFs based on dot product of harmonica
+        double[] newAcfs = new double[freqs.length];
+        for (int i=0; i<freqs.length; i++) {
+            if(freqs[i] < 0)
+                continue;
+
+            newAcfs[i] = acfs[i];
+            for (int j=0; j<freqs.length; j++) {
+                if (i == j || freqs[j] < 0 )
+                    continue;
+                double ratio = freqs[j] / freqs[i];
+                if (ratio < 1) {
+                    continue;
+                }
+                if((ratio > 1.98 && ratio <= 2.02) || (ratio > 2.98 && ratio <= 3.02) ||
+                        (ratio > 3.98 && ratio <= 4.02) || (ratio > 4.98 && ratio <= 5.02)) {
+                    newAcfs[i] *= acfs[j];
+                }
+            }
+        }
+        // Find the max newAcfs from the top two freqs only
+        double selectedFreq = freqs[0];
+        if (newAcfs[1] > newAcfs[0] &&
+                // Experimental tricks to avoid selecting F1 when F0 is strong
+                newAcfs[1]/newAcfs[0] > acfs[0]/acfs[1] // test 1: worked for Harmonium Sa0
+        ) {
+            selectedFreq = freqs[1];
+        }
+        Log.d("HPS", nPitches + ": selectedFreq:" + selectedFreq + " from freqs:" + freqs[0] +
+                ", " + freqs[1] + " acfs:" + acfs[0] + ", " + acfs[1] + " newAcfs:" + newAcfs[0] +
+                ", " + newAcfs[1]);
+        return selectedFreq;
     }
 
     // Step 3: Fine tune freq using ACF
@@ -354,8 +401,8 @@ public class FrequencyAnalyzer {
                 factor++;
             }
         }
-        Log.d("STEP3", "InFreq:" + inputFreq + " outFreq:" + freq/factor + " factor:"
-                + factor);
+        // Log.d("STEP3", "InFreq:" + inputFreq + " outFreq:" + freq/factor + " factor:"
+        //        + factor);
         return freq / factor;
     }
 
@@ -469,7 +516,7 @@ public class FrequencyAnalyzer {
         }
 
         //if(freq != newFreq) {
-            Log.d ("MYANALYZE", "in freq:" + freq + " newFreq:" + newFreq +
+            Log.d ("MYANALYZE", nPitches + ": in freq:" + freq + " newFreq:" + newFreq +
                     " fftVal:" + fftVal + " fFtVal05:" + testFFtVal05 + " fFtVal067:"
                     + testFFtVal067 + " fftVal15:" + testFFtVal15 + " fftVal20:" + testFFtVal20 +
                     " fftVal30:" + testFFtVal30);
@@ -515,8 +562,8 @@ public class FrequencyAnalyzer {
     private double[] getTop5FreqFromAcf() {
         double[] top5Acfs = new double[]{-1, -1, -1, -1, -1};
         double[] top5freqs = new double[]{-1, -1, -1, -1, -1};
-        ArrayList<Integer> peakLocs = new ArrayList<Integer>();
-        ArrayList<Double> peakAcfs = new ArrayList<Double>();
+        ArrayList<Double> peakFreqs = new ArrayList<Double>();
+        ArrayList<Double> peakAcfs =new ArrayList<Double>();
         int scanLimit = 5; // Look up to these many tranches in acf data
         // Initialize max power with MAX freq value we care.
         // Goal is to find a start location in our interested range and avoid harmonics.
@@ -540,76 +587,61 @@ public class FrequencyAnalyzer {
                     acfNow = acfData[i];
                 }
             }
-            /* old code for single max.
-            // Validate if we found ps better than before
-            double delta = psNow - acfMax;
-            // delta negative means we are going downhill
-            // prevDelta +ve means we were going uphill and we just peaked at loc -1
-            if (delta < 0.0d && prevDelta > 0.0d && acfMax > psFound) {
-                // prev ps at loc was the max as delta is now negative
-                locFound = loc - 1;
-                psFound = acfMax;
-            }
-            if (delta != 0.0d) {
-                acfMax = psNow;
-                prevDelta = delta;
-            }
-             */
+
             // Alternate through peaks and valleys and store all of them.
             double delta = acfNow - acfMax;
             // delta negative means we are going downhill
             // prevDelta +ve means we were going uphill and we just peaked at loc -1
-            if (delta < 0.0d && prevDelta >= 0.0d) {
-                peakLocs.add(loc - 1);
+            // acfMax > 0.2 to ignore really small peaks
+            if (delta < 0.0d && prevDelta >= 0.0d && acfMax > 0.2) {
+                peakFreqs.add(samplingSize/ (loc - 1));
                 peakAcfs.add(acfMax);
             }
             acfMax = acfNow;
             prevDelta = delta;
         }
+        ArrayList<Double> sortedAcfs = (ArrayList<Double>) peakAcfs.clone();
+        Collections.sort(sortedAcfs, Collections.reverseOrder());
+        // Find top 5 harmonics.
+        int counter=0;
+        double topFreq = peakFreqs.get(peakAcfs.indexOf(sortedAcfs.get(0)));
+        boolean freqIsHarmonic = false;
+        for(int i=0; i < sortedAcfs.size(); i++) {
+            int index = peakAcfs.indexOf(sortedAcfs.get(i));
+            double freq = peakFreqs.get(index);
+            freqIsHarmonic = isHarmonic(topFreq, freq);
+            if (i == 0 || freqIsHarmonic) {
+                top5freqs[counter] = freq;
+                top5Acfs[counter++] = sortedAcfs.get(i);
 
-        // Now find top 5.
-        for(int i=0; i < peakAcfs.size(); i++) {
-            double acfNow = peakAcfs.get(i);
-            double freq = samplingSize/peakLocs.get(i);
-            if (acfNow > top5Acfs[0]) {
-                top5Acfs[4] = top5Acfs[3];
-                top5Acfs[3] = top5Acfs[2];
-                top5Acfs[2] = top5Acfs[1];
-                top5Acfs[1] = top5Acfs[0];
-                top5Acfs[0] = acfNow;
-                top5freqs[4] = top5freqs[3];
-                top5freqs[3] = top5freqs[2];
-                top5freqs[2] = top5freqs[1];
-                top5freqs[1] = top5freqs[0];
-                top5freqs[0] = freq;
-            } else if (acfNow > top5Acfs[1]) {
-                top5Acfs[4] = top5Acfs[3];
-                top5Acfs[3] = top5Acfs[2];
-                top5Acfs[2] = top5Acfs[1];
-                top5Acfs[1] = acfNow;
-                top5freqs[4] = top5freqs[3];
-                top5freqs[3] = top5freqs[2];
-                top5freqs[2] = top5freqs[1];
-                top5freqs[1] = freq;
-            } else if (acfNow > top5Acfs[2]) {
-                top5Acfs[4] = top5Acfs[3];
-                top5Acfs[3] = top5Acfs[2];
-                top5Acfs[2] = acfNow;
-                top5freqs[4] = top5freqs[3];
-                top5freqs[3] = top5freqs[2];
-                top5freqs[2] = freq;
-            }  else if (acfNow > top5Acfs[3]) {
-                top5Acfs[4] = top5Acfs[3];
-                top5Acfs[3] = acfNow;
-                top5freqs[4] = top5freqs[3];
-                top5freqs[3] = freq;
-            }  else if (acfNow > top5Acfs[4]) {
-                top5Acfs[4] = acfNow;
-                top5freqs[4] = freq;
+                if(counter >= 5) {
+                    break;
+                }
             }
         }
         // Log.d("ACFFREQ", "top5Acfs:" + top5Acfs + " top5freqs:" + top5freqs);
         return top5freqs;
+    }
+
+    // Return true is freq is a harmonic of f0
+    private boolean isHarmonic(double f0, double freq) {
+        double ratio = freq/f0;
+        if (ratio < 1) {
+            ratio = 1 / ratio;
+        }
+
+        if (ratio < 2.09 && ratio > 1.91)
+            return true;
+        if (ratio < 3.09 && ratio > 2.91)
+            return true;
+        if (ratio < 4.09 && ratio > 3.91)
+            return true;
+        if (ratio < 5.09 && ratio > 4.91)
+            return true;
+
+        Log.d("HARMONICS", nPitches + ": ratio:" + ratio + " f0:" + f0 + " freq:" + freq
+        + " f0 power:" + Math.sqrt(acfData[0]));
+        return false;
     }
 
     /*

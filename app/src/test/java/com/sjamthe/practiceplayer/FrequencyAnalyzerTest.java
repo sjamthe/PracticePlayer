@@ -1,7 +1,6 @@
 package com.sjamthe.practiceplayer;
 
 import org.junit.Assert;
-import org.junit.Before;
 import org.junit.Test;
 
 import java.util.Arrays;
@@ -83,6 +82,69 @@ public class FrequencyAnalyzerTest {
                 errorPct, testPitch,detectedPitch);
 
         Assert.assertTrue(errorPct < 1);
+    }
+
+    @Test
+    public void testAllFreqToCentToFreqConversions() {
+        double testPitch = FrequencyAnalyzer.FREQ_C1;
+        while (testPitch <= FrequencyAnalyzer.FREQ_C7) {
+            float cent = FrequencyAnalyzer.FreqToCent(testPitch);
+            double freq = FrequencyAnalyzer.CentToFreq(cent);
+            double error = Math.abs(testPitch - freq);
+            Assert.assertTrue(error < 0.001);
+
+            testPitch *= FrequencyAnalyzer.SEMITONE_INTERVAL;
+        }
+    }
+
+    @Test
+    public void testAllFreqToCent() {
+        double testPitch = FrequencyAnalyzer.FREQ_C1;
+        while(testPitch <= FrequencyAnalyzer.FREQ_C7) {
+            float cent = FrequencyAnalyzer.FreqToCent(testPitch);
+            String centStr = FrequencyAnalyzer.NOTES[FrequencyAnalyzer.CentToNote(cent)] +
+                    String.valueOf(FrequencyAnalyzer.CentToOctave(cent));
+            System.out.printf("InputFreq: %.1f, Cents %.1f, %s\n", testPitch, cent, centStr);
+            testPitch *= FrequencyAnalyzer.SEMITONE_INTERVAL;
+        }
+    }
+
+    @Test
+    public void testFreqToCentRounding() {
+        double testPitch = FrequencyAnalyzer.FREQ_C3;
+        float cent = FrequencyAnalyzer.FreqToCent(testPitch) + 49;
+        String centStr = FrequencyAnalyzer.NOTES[FrequencyAnalyzer.CentToNote(cent)] +
+                String.valueOf(FrequencyAnalyzer.CentToOctave(cent));;
+        System.out.printf("InputFreq: %.1f, Cents %.1f, %s\n", testPitch, cent, centStr);
+
+        cent = FrequencyAnalyzer.FreqToCent(testPitch) + 50;
+        centStr = FrequencyAnalyzer.NOTES[FrequencyAnalyzer.CentToNote(cent)] +
+                String.valueOf(FrequencyAnalyzer.CentToOctave(cent));
+        System.out.printf("InputFreq: %.1f, Cents %.1f, %s\n", testPitch, cent, centStr);
+    }
+
+    @Test
+    public void testFreqToCentSelected() {
+        double[] testFreqs = new double[] {260.95, 262.5};
+        for (int i=0; i<testFreqs.length; i++) {
+            float cent = FrequencyAnalyzer.FreqToCent(testFreqs[i]);
+            String centStr = FrequencyAnalyzer.NOTES[FrequencyAnalyzer.CentToNote(cent)] +
+                    String.valueOf(FrequencyAnalyzer.CentToOctave(cent));
+            System.out.printf("InputFreq: %.2f, Cents %.0f, %s\n", testFreqs[i], cent, centStr);
+        }
+    }
+
+    @Test
+    public void testAddNote() {
+        FrequencyAnalyzer frequencyAnalyzer = new FrequencyAnalyzer(SAMPLING_SIZE);
+        double[] testFreqs = new double[] {260.95, 262.5, 200.12, 130, 120};
+        Integer[] expectedAnswer = new Integer[]{2, 1, 1, 1};
+        for (int i=0; i<testFreqs.length; i++) {
+            frequencyAnalyzer.addNoteToNotesCounter(testFreqs[i]);
+        }
+        Assert.assertEquals(4, frequencyAnalyzer.notesCounter.size());
+        Assert.assertArrayEquals(frequencyAnalyzer.notesCounter.values().toArray(),
+                expectedAnswer);
     }
 
     private void printToCSV(short[] signal) {

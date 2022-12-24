@@ -4,10 +4,15 @@ import android.util.Log;
 
 import androidx.annotation.NonNull;
 
+import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.OptionalDouble;
+
+import be.tarsos.dsp.pitch.McLeodPitchMethod;
+import be.tarsos.dsp.pitch.PitchDetector;
 
 /*
 Find Pitch using ACF (Auto Correlation Function)
@@ -42,8 +47,11 @@ https://github.com/cuthbertLab/music21/blob/master/music21/analysis/discrete.py
  */
 
 public class FrequencyAnalyzer {
+    private final PitchDetector detector;
     FullscreenActivity fullscreenActivity;
 
+    public static  String[] NOTES =
+            new String[] {"C", "Db", "D", "Eb", "E", "F", "F#", "G", "Ab", "A", "Bb", "B"};
     public static final double FREQ_A1 = 55.0d;
     static final double VOLUME_THRESHOLD = 75.0d; // 5.0 is default.
     static final int ANALYZE_SAMPLES_PER_SECOND = 15; // can be a variable
@@ -60,7 +68,7 @@ public class FrequencyAnalyzer {
     public static final double FREQ_MAX = FREQ_C8; // Max frequency we want to detect
     public static final double FREQ_MIN = FREQ_C1 - 5; // Min frequency we want to detect
 
-    static double log2Min = log2(FREQ_MIN);
+    static double log2C1 = log2(FREQ_C1);
 
     public static double log2(double d) {
         return Math.log(d) / Math.log(2.0d);
@@ -71,6 +79,8 @@ public class FrequencyAnalyzer {
     double [] pitchBuffer; // how many pitches do we store? one pitch per analyze call.
     float [] centBuffer; // Stores Pitch converted to log2 scale and relative to FREQ_MIN
     float lastCent;
+    // Hashmap to store perfectCent as key and # of occurrence as value.
+    HashMap<Integer, Integer> notesCounter = new HashMap<Integer, Integer>();
     private int nPitches = 0;
 
     int inputPos = 0;
@@ -96,19 +106,65 @@ public class FrequencyAnalyzer {
 
     private void printToCSV(double[] data) {
         boolean lowValue = true;
-        OptionalDouble maxVal = Arrays.stream(data).max();
-        if(maxVal.getAsDouble() > 10000.0d)  {
-            lowValue = false;
-        }
-        for (int i=0; i<data.length; i++) {
-            if(lowValue)
-                System.out.printf("%4.3e\n", data[i]);
-            else
-                System.out.printf("%.0f\n", data[i]);
+        OptionalDouble maxVal = null;
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N) {
+            maxVal = Arrays.stream(data).max();
+            if(maxVal.getAsDouble() > 10000.0d)  {
+                lowValue = false;
+            }
+            for (int i=0; i<data.length; i++) {
+                if(lowValue)
+                    System.out.printf("%4.3e\n", data[i]);
+                else
+                    System.out.printf("%.0f\n", data[i]);
+            }
         }
         System.out.println();
     }
 
+    // Conversion Functions
+    public static float FreqToCent(double freq) {
+        if (freq < FREQ_C1) {
+            return -1.0f;
+        }
+        return (float) ((log2(freq) - log2C1) * 1200.0d); // Each octave = 1200 cents
+    }
+
+    public static double CentToFreq(float cent) {
+        if (cent < 0) {
+            return -1.0f;
+        }
+        return (double)  FREQ_C1*Math.pow(2, cent/1200.0d) ;
+    }
+
+    // Round up cent to perfect note in every octave
+    public static Integer CentToPerfectCent(float cent) {
+        return Math.round(cent/100)*100;
+    }
+
+    public static int CentToNote(float cent) {
+        return Math.round(cent/100)%12;
+        // String strNote = notes[note] + octave;
+    }
+
+    public static int CentToOctave(float cent) {
+        return Math.round(cent/1200) + 1; // Each Octave has 1200 cents;
+    }
+
+    void addNoteToNotesCounter(double freq) {
+        if(freq < 0)
+            return;
+
+        Integer perfectNote = CentToPerfectCent(FreqToCent(freq));
+        Integer count = notesCounter.get(perfectNote);
+        if(count == null) {
+            notesCounter.put(perfectNote, 0);
+            count = 0;
+        }
+        notesCounter.put(perfectNote, count+1);
+    }
+
+    // Cumulative amplitude - this comes very close to acfdata[0]
     private double sumSignal(double[] data) {
         double sum = 0;
         if(data.length < 1) {
@@ -119,6 +175,20 @@ public class FrequencyAnalyzer {
             sum += Math.abs(data[i]);
         }
         return sum;
+    }
+
+    public String getSongKey() {
+        Integer largestKey = null;
+        int largestValue = Integer.MIN_VALUE;
+        for (Integer key : notesCounter.keySet()) {
+            if (notesCounter.get(key) > largestValue) {
+                largestKey = key;
+                largestValue = notesCounter.get(key);
+            }
+        }
+        String songKey = FrequencyAnalyzer.NOTES[FrequencyAnalyzer.CentToNote(largestKey)] +
+                String.valueOf(FrequencyAnalyzer.CentToOctave(largestKey));
+        return songKey;
     }
 
     public FrequencyAnalyzer(double samplingSize) {
@@ -133,7 +203,8 @@ public class FrequencyAnalyzer {
         this.pitchBuffer = new double[(int) (30.0*this.samplingSize/this.analyzeSize)];
         this.centBuffer = new float[this.pitchBuffer.length];
         fft = new FFT4g(this.fftSize);
-        // this.mainChart = lineChart;
+
+        detector = new McLeodPitchMethod((float) this.samplingSize, this.fftSize);// better than Yin
     }
 
     private final Runnable runUpdateChart = new Runnable() {
@@ -170,13 +241,19 @@ public class FrequencyAnalyzer {
 
     void analyze() {
         // Prepare data to analyze
+        // TEST PitchDetectionResult yinResult = null;
         double pitch = -1;
         if(sumSignal(inputBuffer) >= this.threshold) {
             signal = new double[fftSize];
+            // float[] sigCopy = new float[fftSize];
             for (int i = analyzePos, j = 0; j < fftSize; i++, j++) {
                 int pos = i % inputBuffer.length; // to support round robbin.
                 signal[j] = inputBuffer[pos] * haanData[j] / Short.MAX_VALUE;
+                // sigCopy[j] = (float) signal[j];
             }
+
+            // TEST yinResult = detector.getPitch(sigCopy);
+
             fftData = signal.clone();
             // Get FFT for the data.
             fft.rdft(1, fftData); // Note: rdft does in-place replacement of fftData
@@ -186,21 +263,25 @@ public class FrequencyAnalyzer {
             //Calculate Auto Correlation from with inverseFFT
             fft.rdft(-1, acfData); // Note: rdft does in-place replacement for acfData
             normalizeACF(); //Normalize ACF data
-
-            if (Math.sqrt(acfData[0]) >= this.threshold) {
-                pitch = findPitch();
-            }
+            pitch = findPitch();
         }
-        // Log.d("THRESHOLD", "acf power measure:" + Math.sqrt(acfData[0])
-        // + " signal power:" + sumSignal(signal));
-
-
         pitchBuffer[nPitches%pitchBuffer.length] = pitch;
+        addNoteToNotesCounter(pitch); // Add Note to the notesCounter;
+
+        /* TEST float yinPitch = -1;
+        if(yinResult != null) {
+            yinPitch = yinResult.getPitch();
+            Log.d("YIN", "YinPitch:" + yinPitch + " prob:" + yinResult.getProbability()
+            + " myPitch:" + pitch);
+        }*/
+
         lastCent = FreqToCent(pitch);
         centBuffer[nPitches%pitchBuffer.length] = lastCent;
         nPitches++;
-        /* if (nPitches == pitchBuffer.length)
-            nPitches = 0;*/
+
+        if(nPitches%500 == 0) {
+            Log.i("KEY", "SongKey:" + getSongKey());
+        }
 
         if(fullscreenActivity != null && fullscreenActivity.fullScreenHandler != null)
             fullscreenActivity.fullScreenHandler.post(runUpdateChart);
@@ -213,13 +294,6 @@ public class FrequencyAnalyzer {
         for (int i=1; i< acfData.length; i++) {
             acfData[i] = acfData[i] / acfData[0];
         }
-    }
-
-    public static float FreqToCent(double freq) {
-        if (freq < FREQ_MIN) {
-            return -1.0f;
-        }
-        return (float) ((log2(freq) - log2Min) * 1200.0d); // Each octave = 1200 cents
     }
 
     double [] calcPowerSpectrum(@NonNull double [] data) {
@@ -247,22 +321,31 @@ public class FrequencyAnalyzer {
 
     /* Go through all stages of pitch detection update array with current pitch and prev pitches */
     private double findPitch() {
-        double foundPitch = -1.0d;
+        double[] freqs = new double[] {-1, -1, -1, -1, -1};
+        double selectedFreq = -1;
+        double finalFreq = -1;
+        double signalPower = Math.sqrt(acfData[0]);
 
-        // Step 1: Find freq from ACF
-        double [] freqs = getTop5FreqFromAcf();
-        // Step 2: fine tuning freq using FFT
-        // double newFreq = fineTuneFreqWithFft(freqs[0]);
-        // double mynewFreq = getRightHarmonic(freqs[0]); // getRightHarmonic(freq);
+        if (signalPower >= this.threshold) {
+            // Step 1: Find freq from ACF
+            freqs = getTop5FreqFromAcf();
+            // Step 2: Select pitch based on last 2 pitches, also adjust last 2 pitches based on current
+            selectedFreq = selectCorrectPitch(freqs);
+            // Step 3: Fine tune step2 freq using ACF
+            finalFreq = fineTuneStep3(selectedFreq);
+        }
+        // Logging only
+        DecimalFormat df = new DecimalFormat("###.##");
+        String freqsString = ":freqs ";
+        for (int i=0; i<freqs.length; i++) {
+            freqsString = freqsString + ":[" + i + "]:" + df.format(freqs[i]) ;
+        }
+        Log.d("FINAL", nPitches + ":Note:" + CentToNote(FreqToCent(finalFreq)) +
+                ":Octave:" + CentToOctave(FreqToCent(finalFreq)) +
+                ":power:" + df.format(signalPower) +
+                ":selectedFreq:" + df.format(selectedFreq) +
+                ":finalFreq:"+ df.format(finalFreq) + freqsString);
 
-        // Step 2: Select pitch based on last 2 pitches, also adjust last 2 pitches based on current
-        double selectedFreq = selectCorrectPitch(freqs);
-
-        // Step 3: Fine tune step2 freq using ACF
-        double finalFreq = fineTuneStep3(selectedFreq);
-        Log.d("FINAL", nPitches + ": power:" + Math.sqrt(acfData[0]) +
-                ": freqs[0]:" + freqs[0] + " selectedFreq:" + selectedFreq +
-                " finalFreq:" + finalFreq);
         return finalFreq;
     }
 
@@ -348,16 +431,12 @@ public class FrequencyAnalyzer {
             for (int j=0; j<freqs.length; j++) {
                 if (i == j || freqs[j] < 0 )
                     continue;
-                double ratio = freqs[j] / freqs[i];
-                if (ratio < 1) {
-                    continue;
-                }
-                if((ratio > 1.98 && ratio <= 2.02) || (ratio > 2.98 && ratio <= 3.02) ||
-                        (ratio > 3.98 && ratio <= 4.02) || (ratio > 4.98 && ratio <= 5.02)) {
+                if (isHarmonic(freqs[i], freqs[j])) {
                     newAcfs[i] *= acfs[j];
                 }
             }
         }
+
         // Find the max newAcfs from the top two freqs only
         double selectedFreq = freqs[0];
         if (newAcfs[1] > newAcfs[0] &&
@@ -366,9 +445,9 @@ public class FrequencyAnalyzer {
         ) {
             selectedFreq = freqs[1];
         }
-        Log.d("HPS", nPitches + ": selectedFreq:" + selectedFreq + " from freqs:" + freqs[0] +
-                ", " + freqs[1] + " acfs:" + acfs[0] + ", " + acfs[1] + " newAcfs:" + newAcfs[0] +
-                ", " + newAcfs[1]);
+        Log.d("HPS", nPitches + ":selectedFreq:" + selectedFreq + "from freqs:" + freqs[0] +
+                ":" + freqs[1] + ":acfs:" + acfs[0] + ":" + acfs[1] + ":newAcfs:" + newAcfs[0] +
+                ":" + newAcfs[1]);
         return selectedFreq;
     }
 
@@ -604,13 +683,20 @@ public class FrequencyAnalyzer {
         Collections.sort(sortedAcfs, Collections.reverseOrder());
         // Find top 5 harmonics.
         int counter=0;
-        double topFreq = peakFreqs.get(peakAcfs.indexOf(sortedAcfs.get(0)));
-        boolean freqIsHarmonic = false;
+        double top1Freq = peakFreqs.get(peakAcfs.indexOf(sortedAcfs.get(0)));
+        // sometimes top2freq is not a harmonic of top1, in that case we get harmonics for top2freq
+        double top2Freq = -1;
+        if(sortedAcfs.size() > 1) {
+            peakFreqs.get(peakAcfs.indexOf(sortedAcfs.get(1)));
+        }
+        boolean freq1IsHarmonic = false;
+        boolean freq2IsHarmonic = false;
         for(int i=0; i < sortedAcfs.size(); i++) {
             int index = peakAcfs.indexOf(sortedAcfs.get(i));
             double freq = peakFreqs.get(index);
-            freqIsHarmonic = isHarmonic(topFreq, freq);
-            if (i == 0 || freqIsHarmonic) {
+            freq1IsHarmonic = isHarmonic(top1Freq, freq);
+            freq2IsHarmonic = isHarmonic(top2Freq, freq);
+            if (i == 0 || freq1IsHarmonic || freq2IsHarmonic) {
                 top5freqs[counter] = freq;
                 top5Acfs[counter++] = sortedAcfs.get(i);
 
@@ -619,7 +705,6 @@ public class FrequencyAnalyzer {
                 }
             }
         }
-        // Log.d("ACFFREQ", "top5Acfs:" + top5Acfs + " top5freqs:" + top5freqs);
         return top5freqs;
     }
 
@@ -630,17 +715,17 @@ public class FrequencyAnalyzer {
             ratio = 1 / ratio;
         }
 
-        if (ratio < 2.09 && ratio > 1.91)
+        if (ratio < 2.15 && ratio > 1.85)
             return true;
-        if (ratio < 3.09 && ratio > 2.91)
+        if (ratio < 3.15 && ratio > 2.85)
             return true;
-        if (ratio < 4.09 && ratio > 3.91)
+        if (ratio < 4.15 && ratio > 3.85)
             return true;
-        if (ratio < 5.09 && ratio > 4.91)
+        if (ratio < 5.15 && ratio > 4.85)
             return true;
 
-        Log.d("HARMONICS", nPitches + ": ratio:" + ratio + " f0:" + f0 + " freq:" + freq
-        + " f0 power:" + Math.sqrt(acfData[0]));
+        // Log.d("HARMONICS", nPitches + ": ratio:" + ratio + " f0:" + f0 + " freq:" + freq
+        // + " f0 power:" + Math.sqrt(acfData[0]));
         return false;
     }
 

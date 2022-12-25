@@ -15,6 +15,7 @@ import android.media.MediaExtractor;
 import android.media.MediaFormat;
 import android.media.MediaPlayer;
 import android.net.Uri;
+import android.os.Build;
 import android.util.Log;
 
 import java.io.IOException;
@@ -120,9 +121,12 @@ public class Player {
 
         int minBufferSize = AudioTrack.getMinBufferSize(sampleRate,
                 AudioFormat.CHANNEL_OUT_MONO, AudioFormat.ENCODING_PCM_16BIT);
-        Log.i(LOG_TAG, "AudioTrack.getMinBufferSize : " + minBufferSize);
         audioTrack = new AudioTrack(audioAttributes, audioFormat, minBufferSize, MODE_STREAM,
                 AUDIO_SESSION_ID_GENERATE);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            Log.i(LOG_TAG, "AudioTrack.getMinBufferSize : " + minBufferSize +
+                    " bufferSizeSet :" + audioTrack.getBufferSizeInFrames());
+        }
 
         setPlayerState(PLAYSTATE_PLAYING);
     }
@@ -212,8 +216,9 @@ public class Player {
             res = getSamplesForChannel(outputBufferId, 0);
             // Don't write this buffer if seek is true
             if(!seek & res.length > 0) {
-                frequencyAnalyzer.addData(res);
-                int ret = audioTrack.write(res, info.offset, info.offset + res.length);
+                short[] res2 = frequencyAnalyzer.addData(res);
+                int ret = audioTrack.write(res2, info.offset, info.offset + res2.length);
+                // int ret = audioTrack.write(res, info.offset, info.offset + res.length);
             }
             codec.releaseOutputBuffer(outputBufferId, false);
             // Log.d(LOG_TAG,  "output buffer id " + outputBufferId);

@@ -51,6 +51,7 @@ public class FullscreenActivity extends AppCompatActivity {
     private TextView songSeekBarPosition;
     private TextView markerStartPosition;
     private TextView markerStopPosition;
+    private TextView lastCents;
     private MaterialButton fileButton;
     private MaterialButton playButton;
     private MaterialButton markerButton;
@@ -247,6 +248,14 @@ public class FullscreenActivity extends AppCompatActivity {
 
         // move to the latest entry
         lineChart.moveViewToX(lineData.getEntryCount()); // no lines if disabled
+
+        if(dataIn > 0) {
+            lastCents.setText(FrequencyAnalyzer.NOTES[FrequencyAnalyzer.centToNote(dataIn)] +
+                    String.valueOf(FrequencyAnalyzer.centToOctave(dataIn)));
+            lastCents.setVisibility(View.VISIBLE);
+        } else {
+            lastCents.setText("--");
+        }
     }
 
     private final Runnable mHidePart2Runnable = new Runnable() {
@@ -340,6 +349,9 @@ public class FullscreenActivity extends AppCompatActivity {
         markerStartPosition.setVisibility(View.GONE);
         markerStopPosition = findViewById(R.id.stop_position);
         markerStopPosition.setVisibility(View.GONE);
+
+        lastCents = findViewById(R.id.last_cents);
+        lastCents.setVisibility(View.GONE);
 
         songSeekBar = findViewById(R.id.seek_bar);
         songSeekBar.setVisibility(View.GONE);

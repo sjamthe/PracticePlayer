@@ -45,6 +45,16 @@
             android:textSize="20sp"
             android:textStyle="bold" />
 -->
+        <TextView
+            android:id="@+id/last_cents"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:gravity="center"
+            android:layout_alignParentStart="true"
+            android:textColor="@color/design_default_color_on_primary"
+            android:textSize="24dp"
+            android:text="C0" />
+
         <com.github.mikephil.charting.charts.LineChart
             android:id="@+id/activity_main_linechart"
             android:layout_width="match_parent"

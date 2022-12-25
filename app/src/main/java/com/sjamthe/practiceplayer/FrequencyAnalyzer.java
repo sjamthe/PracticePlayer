@@ -76,7 +76,8 @@ public class FrequencyAnalyzer {
     }
 
     double [] haanData;
-    double [] inputBuffer;
+    // short [] playData; // Contains data that has been analyzed and ready to play.
+    short [] inputBuffer;
     double [] pitchBuffer; // how many pitches do we store? one pitch per analyze call.
     float [] centBuffer; // Stores Pitch converted to log2 scale and relative to FREQ_MIN
     float lastCent;
@@ -87,7 +88,10 @@ public class FrequencyAnalyzer {
     private int nPitches = 0;
 
     int inputPos = 0;
+    int totalFrames = 0;
     int analyzePos = 0;
+    int writePos = 0;
+    int readPos = 0;
     double samplingSize;
     double threshold = VOLUME_THRESHOLD;
     FFT4g fft;
@@ -172,7 +176,7 @@ public class FrequencyAnalyzer {
     }
 
     // Cumulative amplitude - this comes very close to acfdata[0]
-    private double sumSignal(double[] data) {
+    private double sumSignal(short[] data) {
         double sum = 0;
         if(data.length < 1) {
             return sum;
@@ -209,7 +213,8 @@ public class FrequencyAnalyzer {
        // Log.d("FFT", "FFT_SIZE :" + this.fftSize + " SAMPLING_SIZE :" + samplingSize);
        // Log.d("FFT", "FREQ_A1 :" + FREQ_A1 + " FREQ_C1 :" + FREQ_C1);
         haanData = haanWindow();
-        this.inputBuffer = new double[2*(this.fftSize)];
+        this.inputBuffer = new short[2*(this.fftSize)];
+        // this.playData = new short[this.inputBuffer.length];
         this.pitchBuffer = new double[(int) (30.0*this.samplingSize/this.analyzeSize)];
         this.centBuffer = new float[this.pitchBuffer.length];
         fft = new FFT4g(this.fftSize);
@@ -233,32 +238,48 @@ public class FrequencyAnalyzer {
         return dataOut;
     }
 
-    public void addData(short[] res) {
+    public short[] addData(short[] res) {
         assert (res.length < inputBuffer.length);
+        short[] resOut = new short[0];
+
         int j;
-        for(j=0; j<res.length;j++) {
+        for (j=0; j<res.length;j++) {
             inputBuffer[inputPos++] = res[j];
-            if(inputPos == inputBuffer.length) {
+            // playData[totalFrames%playData.length] = res[j];
+            totalFrames++;
+            if (inputPos == inputBuffer.length) {
                 // If we reached end of inputBuffer start from beginning
                 inputPos = 0;
             }
             // make sure analyzePos doesn't exceed inputData.length
-            if(inputPos%analyzeSize == 0) {
+            if (inputPos%analyzeSize == 0 && totalFrames >= fftSize) {
+                // If we don't let the buffer fill till FFTSIZE we are
+                // analyzing padding of zeros, so added >= fftsize check for 1st time.
                 analyze();
             }
         }
+        if(nPitches > 0) {
+            // read data that was analyzed but same size that came in
+            resOut = new short[res.length];
+            for (int i = 0; i < resOut.length; i++) {
+                resOut[i] = inputBuffer[readPos%inputBuffer.length];;
+                readPos++;
+            }
+        }
+        return resOut;
     }
 
     void analyze() {
         // Prepare data to analyze
         double pitch = -1;
         signal = new double[fftSize];
-        if(sumSignal(inputBuffer) >= this.threshold) {
-            for (int i = analyzePos, j = 0; j < fftSize; i++, j++) {
-                int pos = i % inputBuffer.length; // to support round robbin.
-                signal[j] = inputBuffer[pos] * haanData[j] / Short.MAX_VALUE;
-            }
 
+        for (int i = analyzePos, j = 0; j < fftSize; i++, j++) {
+            int pos = i % inputBuffer.length; // to support round robbin.
+            signal[j] = inputBuffer[pos] * haanData[j] / Short.MAX_VALUE;
+  }
+
+        if(sumSignal(inputBuffer) >= this.threshold) {
             fftData = signal.clone();
             // Get FFT for the data.
             fft.rdft(1, fftData); // Note: rdft does in-place replacement of fftData
@@ -382,17 +403,13 @@ public class FrequencyAnalyzer {
         // Get last 5 cents - remember we round robbin.
         double[] prevCents = new double[5];
         for (int i=1; i<=5; i++) {
-            if(nPitches -i >= 0) {
-                prevCents[i - 1] = this.centBuffer[nPitches - i];
-            } else {
-                prevCents[i - 1] = this.centBuffer[i - nPitches];
-            }
+            prevCents[i - 1] = this.centBuffer[Math.abs(nPitches%pitchBuffer.length - i)];
         }
         // 1. If any harmonic from freqs matches any harmonics from last 5 freqs AND the harmonics
         // ACF > MIN_ACF; then select the matching harmonic.
         // 2. If there is no match of exact freq from last 5 then take one that is closest to the
         // averageCent and ACF > MIN_ACF.
-        double selectedFreq = freqs[0];
+        double selectedFreq = freqs[0]; // Default unless match with history or low acfs[0]
         boolean found = false;
         for (int i=0; i<freqs.length; i++) {
             if(freqs[i] < -1 || acfs[i] < MIN_ACF) {
@@ -412,29 +429,37 @@ public class FrequencyAnalyzer {
                 break;
         }
 
+        /*
         double minGap = 2400;
-        if(!found && lastCent > 0) {
-            // STEP 2 - compare with averageCent
+        if(!found && lastCent > 0 && acfs[0] < 0.9) {
+            // STEP 2 - compare with lastCent unless we are confident of freqs[0] ie acf[0] >=0.9
             for (int i=0; i<freqs.length; i++) {
                 if(acfs[i] >= MIN_ACF) {
                     double gap = Math.abs(cents[i] - lastCent);
                     if(gap <= minGap) {
                         selectedFreq = freqs[i];
-                    }
                         minGap = gap;
                     }
                 }
+            }
         }
+
+        if(averageCent > 2400 &&
+                Math.abs(freqToCent(selectedFreq) -averageCent) > 2400) {
+            // We don't expect a deviation above 2 Octaves in a song
+            selectedFreq = -1;
+        }*/
 
         String freqStr = LogStr("freqs", freqs);
         String acfsStr = LogStr("acfs", acfs);
         DecimalFormat df = new DecimalFormat("###.##");
+        /*
         Log.d("HPS", nPitches +  ":power:" + df.format(Math.sqrt(acfData[0])) +
                 ":Note:" + centToNote(freqToCent(selectedFreq)) +
                 ":Octave:" + centToOctave(freqToCent(selectedFreq)) +
                 ":selectedFreq:" + df.format(selectedFreq) +
                 freqStr + acfsStr);
-
+*/
         return selectedFreq;
 /*
         // Else compare with past two pitches in pitchBuffer

@@ -33,7 +33,6 @@ import com.github.mikephil.charting.data.Entry;
 import com.github.mikephil.charting.data.LineData;
 import com.github.mikephil.charting.data.LineDataSet;
 import com.github.mikephil.charting.interfaces.datasets.ILineDataSet;
-import com.github.mikephil.charting.utils.ColorTemplate;
 import com.google.android.material.button.MaterialButton;
 import com.sjamthe.practiceplayer.databinding.ActivityFullscreenBinding;
 
@@ -193,8 +192,8 @@ public class FullscreenActivity extends AppCompatActivity {
         lineChart.getAxisRight().setEnabled(false); // disable right axis, we only need left
         YAxis yAxis = lineChart.getAxisLeft();
         // yAxis.setAxisMaximum(FrequencyAnalyzer.FreqToCent(FrequencyAnalyzer.FREQ_C4));
-        yAxis.setAxisMaximum(FrequencyAnalyzer.FreqToCent(FrequencyAnalyzer.FREQ_C5));
-        yAxis.setAxisMinimum(FrequencyAnalyzer.FreqToCent(FrequencyAnalyzer.FREQ_C2));
+        yAxis.setAxisMaximum(FrequencyAnalyzer.freqToCent(FrequencyAnalyzer.FREQ_C5));
+        yAxis.setAxisMinimum(FrequencyAnalyzer.freqToCent(FrequencyAnalyzer.FREQ_C2));
         XAxis xAxis = lineChart.getXAxis();
         xAxis.setAvoidFirstLastClipping(true);
 

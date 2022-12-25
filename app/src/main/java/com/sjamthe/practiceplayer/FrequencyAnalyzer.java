@@ -81,6 +81,7 @@ public class FrequencyAnalyzer {
     double [] pitchBuffer; // how many pitches do we store? one pitch per analyze call.
     float [] centBuffer; // Stores Pitch converted to log2 scale and relative to FREQ_MIN
     float lastCent;
+    float displayCent;
     double averageCent = 0;
     double nCents = 0;
     // Hashmap to store perfectCent as key and # of occurrence as value.
@@ -213,7 +214,7 @@ public class FrequencyAnalyzer {
        // Log.d("FFT", "FFT_SIZE :" + this.fftSize + " SAMPLING_SIZE :" + samplingSize);
        // Log.d("FFT", "FREQ_A1 :" + FREQ_A1 + " FREQ_C1 :" + FREQ_C1);
         haanData = haanWindow();
-        this.inputBuffer = new short[2*(this.fftSize)];
+        this.inputBuffer = new short[5*(this.fftSize)];
         // this.playData = new short[this.inputBuffer.length];
         this.pitchBuffer = new double[(int) (30.0*this.samplingSize/this.analyzeSize)];
         this.centBuffer = new float[this.pitchBuffer.length];
@@ -225,7 +226,7 @@ public class FrequencyAnalyzer {
     private final Runnable runUpdateChart = new Runnable() {
         @Override
         public void run() {
-            fullscreenActivity.updateChart(lastCent);
+            fullscreenActivity.updateChart(displayCent);
         }
     };
 
@@ -258,7 +259,9 @@ public class FrequencyAnalyzer {
                 analyze();
             }
         }
-        if(nPitches > 0) {
+        if(nPitches >= 3) {
+            // We lab the display by 3 pitches so we can correct n-3 by looking forward
+            displayCent = centBuffer[(nPitches - 3)%pitchBuffer.length];
             // read data that was analyzed but same size that came in
             resOut = new short[res.length];
             for (int i = 0; i < resOut.length; i++) {

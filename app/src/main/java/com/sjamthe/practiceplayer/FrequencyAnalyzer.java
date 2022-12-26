@@ -10,8 +10,6 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.OptionalDouble;
-import java.util.PriorityQueue;
-import java.util.Stack;
 
 import be.tarsos.dsp.pitch.McLeodPitchMethod;
 import be.tarsos.dsp.pitch.PitchDetectionResult;
@@ -378,8 +376,8 @@ public class FrequencyAnalyzer {
 
         curRecord.pos = nPitches;
         if (signalPower >= this.threshold) {
-            curRecord.cents = getTop5CentsFromAcf();
-            curRecord.acfs = getAcfsFromCents(curRecord.cents);
+            getTop5CentsFromAcf(curRecord);
+            // curRecord.acfs = getAcfsFromCents(curRecord.cents);
         } else {
             double[] acfs = new double[] {-1, -1, -1, -1, -1};
             float[]  cents = new float[] {-1, -1, -1, -1, -1};
@@ -443,11 +441,11 @@ public class FrequencyAnalyzer {
                 }
                 double diff = Math.abs(curCent - last5Cents[j]);
                 if(diff <= 50) {
-                    curPoint += 2 * (last5Cents.length - j)/last5Cents.length;
+                    curPoint += 2 * (last5Cents.length - j)/last5Cents.length * curRecord.acfs[i];
                 } else if (diff <= 1200) {
-                    curPoint += 1 * (last5Cents.length - j)/last5Cents.length;
+                    curPoint += 1 * (last5Cents.length - j)/last5Cents.length * curRecord.acfs[i];
                 } else if (diff <= 2400) {
-                    curPoint += 0.5 * (last5Cents.length - j)/last5Cents.length;
+                    curPoint += 0.5 * (last5Cents.length - j)/last5Cents.length * curRecord.acfs[i];
                 }
             }
             // Step 2: FUTURE POINTS
@@ -457,8 +455,14 @@ public class FrequencyAnalyzer {
                 for (int k=0; k<futureCents.length; k++) {
                     if (futureCents[k] > 0 &&
                             Math.abs(curRecord.cents[i] - futureCents[k]) <= 50) {
-                        curPoint += futureAcfs[k] * 2 * (futureCents.length - k)/futureCents.length;
-                    }
+                        curPoint += 2 * (futureRecords.size() - j) * futureAcfs[k]
+                                * (futureCents.length - k)/futureCents.length;
+                    }/*
+                    else if (futureCents[k] > 0 &&
+                            Math.abs(curRecord.cents[i] - futureCents[k]) <= 1200) {
+                        curPoint += 1 * (futureRecords.size() - j) * futureAcfs[k]
+                                * (futureCents.length - k)/futureCents.length;
+                    }*/
                 }
             }
             points[i] = curPoint; // Got all the points
@@ -743,11 +747,9 @@ public class FrequencyAnalyzer {
     /*
     * Find the TOP 5 peak ACF in our interest range, return freq in desc order of ACF
      */
-    private float[] getTop5CentsFromAcf() {
-        double[] top5Acfs = new double[]{-1, -1, -1, -1, -1};
-        double[] top5freqs = new double[]{-1, -1, -1, -1, -1};
-        float[] top5Cents = new float[]{-1, -1, -1, -1, -1};
-        ArrayList<Double> peakFreqs = new ArrayList<Double>();
+    private void getTop5CentsFromAcf(Record record) {
+        record.acfs = new double[]{-1, -1, -1, -1, -1};
+        record.cents = new float[]{-1, -1, -1, -1, -1};
         ArrayList<Float> peakCents = new ArrayList<Float>();
         ArrayList<Double> peakAcfs =new ArrayList<Double>();
         int scanLimit = 5; // Look up to these many tranches in acf data
@@ -809,15 +811,14 @@ public class FrequencyAnalyzer {
             freq2IsHarmonic = isHarmonic(top2Cent, cent);
             if (i == 0 || freq1IsHarmonic || freq2IsHarmonic) {
                 //top5freqs[counter] = freq;
-                top5Cents[counter] = cent;
-                top5Acfs[counter++] = sortedAcfs.get(i);
+                record.cents[counter] = cent;
+                record.acfs[counter++] = sortedAcfs.get(i);
 
                 if(counter >= 5) {
                     break;
                 }
             }
         }
-        return top5Cents;
     }
 
     // Return true is freq is a harmonic of f0

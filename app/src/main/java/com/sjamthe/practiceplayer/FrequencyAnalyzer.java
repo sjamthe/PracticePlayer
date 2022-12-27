@@ -54,7 +54,7 @@ public class FrequencyAnalyzer {
     public static  String[] NOTES =
             new String[] {"C", "Db", "D", "Eb", "E", "F", "F#", "G", "Ab", "A", "Bb", "B"};
     public static final double FREQ_A1 = 55.0d;
-    static final double VOLUME_THRESHOLD = 0.0d; // 5.0 is default.
+    static final double VOLUME_THRESHOLD = 50.0d; // 5.0 is default.
     static final int ANALYZE_SAMPLES_PER_SECOND = 15; // can be a variable
     public static final double SEMITONE_INTERVAL = Math.pow(2.0d, 1.0d/12.0d); // 1.05946
     // Example:calculate any freq like C3 will be 12 (which is A2) +3 semitones from A1 or 130.8Hz
@@ -80,8 +80,11 @@ public class FrequencyAnalyzer {
         int pos;
         float[] cents;
         double[] acfs;
+        float selectedCent; // the cents that was finally selected.
+        double points; // Points acquired
     };
     ArrayList<Record> futureRecords = new ArrayList<Record>();
+    ArrayList<Record> pastRecords = new ArrayList<Record>();
 
     double [] haanData;
     // short [] playData; // Contains data that has been analyzed and ready to play.
@@ -419,11 +422,8 @@ public class FrequencyAnalyzer {
     // If last cent doesn't match then 1 point if it <= 1 octave, 0.5 for 2 octaves.
     // Compare with future cents use matching futureCents ACF as points.
     private double selectCorrectPitch() {
+        double minPointLimit = 4.0; // If points are below this we have low confidence
         Record curRecord = futureRecords.remove(0); // Record we are selecting Pitch for.
-        float[] last5Cents = new float[5];
-        for (int i=1; i<=5; i++) {
-            last5Cents[i - 1] = this.centBuffer[Math.abs(nPitches%pitchBuffer.length - i)];
-        }
         double[] histPoints = new double[curRecord.cents.length];
         double[] futurePoints = new double[curRecord.cents.length];
         for (int i=0; i<curRecord.cents.length; i++) {
@@ -433,44 +433,46 @@ public class FrequencyAnalyzer {
             if(curCent <= 0) {
                 continue;
             }
-            // Initialize points from ACF
-            // points[i] = curRecord.acfs[i]; // So if there is no hist or future we select F0
             // Step 1: HISTORY POINTS - Weighted by how close in history
-            for (int j=0; j<last5Cents.length; j++) {
-                if(last5Cents[j] <= 0) {
-                    continue;
+            for (int j=0; j<pastRecords.size(); j++) {
+                float nearness = (j + 1.0f)/pastRecords.size(); // higher numbers in pastRecords are closer to current.
+                float[] pastCents = pastRecords.get(j).cents;
+                double[] pastAcfs = pastRecords.get(j).acfs;
+                for (int k=0; k<pastCents.length; k++) {
+                    double diff = Math.abs(centToPerfectCent(curCent)
+                            - centToPerfectCent(pastCents[k]));
+                    if (pastCents[k] > 0 && diff == 0) {
+                        histPoints[i] += 1.0f * nearness * Math.pow(pastAcfs[k], 2);
+                    }
                 }
-                double diff = Math.abs(centToPerfectCent(curCent)
-                        - centToPerfectCent(last5Cents[j]));
-                float nearness = 1.0f*(last5Cents.length - j)/last5Cents.length;
-                if(diff == 0) { // We have seen this cent before
-                    histPoints[i] += 5.0 * nearness;
-                } else if (diff <= 1200) { // Not this cent but same octave gap.
-                    histPoints[i] += 2.0 * nearness;
-                } else if (diff <= 2400) {
-                    histPoints[i] += 0.5 * nearness;
+                // Give some weight to the last selected scent.
+                if(pastRecords.get(j).points >= minPointLimit) {
+                    double diff = Math.abs(centToPerfectCent(curCent)
+                            - centToPerfectCent(pastRecords.get(j).selectedCent));
+                    // Points if frequency has history
+                    if (diff == 0) {
+                        histPoints[i] += 1.0f * nearness;
+                    }
+                    // More points if frequency is withing 1/2 octave
+                    if (diff < 600) { // points for closer pitches
+                        histPoints[i] += 0.1f * nearness; // additional point is same freq, else only one.
+                    }
                 }
             }
             // Step 2: FUTURE POINTS
             for (int j=0; j<futureRecords.size(); j++) {
-                float nearness = (5 - j); // We want 5 amd 4 values
+                float nearness = (5.0f - j)/futureRecords.size(); // We want 5 amd 4 values
                 float[] futureCents = futureRecords.get(j).cents;
                 double[] futureAcfs = futureRecords.get(j).acfs;
                 for (int k=0; k<futureCents.length; k++) {
                     if (futureCents[k] > 0 &&
-                            Math.abs(centToPerfectCent(curRecord.cents[i])
+                            Math.abs(centToPerfectCent(curCent)
                                     - centToPerfectCent(futureCents[k])) == 0) {
-                        futurePoints[i] += 1.0f * nearness * futureAcfs[k];
-                    }/*
-                    else if (futureCents[k] > 0 &&
-                            Math.abs(curRecord.cents[i] - futureCents[k]) <= 1200) {
-                        curPoint += 1 * (futureRecords.size() - j) * futureAcfs[k]
-                                * (futureCents.length - k)/futureCents.length;
-                    }*/
+                        futurePoints[i] += 1.0f * nearness * Math.pow(futureAcfs[k], 2);
+                    }
                 }
             }
         }
-
         // Record with highest point will be selected, if 0 points then -1
         double maxPoints = 0;
         int selectedIndex = -1;
@@ -478,32 +480,41 @@ public class FrequencyAnalyzer {
         for (int i=0; i<histPoints.length; i++) {
             double point = curRecord.acfs[i] + histPoints[i] + futurePoints[i];
             if(point > maxPoints) {
+                maxPoints = point;
                 selectedIndex = i;
                 selectedCent = curRecord.cents[i];
-                maxPoints = point;
             }
         }
         // If selectedCent is 1 or two octave higher than history then drop it to same octave
-        for (int i=0; i< last5Cents.length; i++) {
-            if(last5Cents[i] <= 0) {
-                continue;
-            }
-            int diff = centToPerfectCent(selectedCent)
-                    - centToPerfectCent(last5Cents[i]);
-            switch (diff) {
-                case 1200:
-                    selectedCent = selectedCent - 1200;
+        // Start reverse as that record is closest to current
+        // TODO: This can take you to a different octave. need better checks like average pitch
+        /*
+        for (int j = pastRecords.size() - 1; j >= 0; j--) {
+            if (pastRecords.get(j).selectedCent > 0
+                    && pastRecords.get(j).points >= minPointLimit) {
+                int diff = centToPerfectCent(selectedCent)
+                        - centToPerfectCent(pastRecords.get(j).selectedCent);
+                if (diff >= 1200) {
+                    selectedCent = centToPerfectCent(pastRecords.get(j).selectedCent)
+                            + selectedCent % 1200;
                     break;
-                case -1200:
-                    selectedCent = selectedCent + 1200;
-                case 2400:
-                    selectedCent = selectedCent - 2400;
+                } else if (diff <= -1200) {
+                    selectedCent = centToPerfectCent(pastRecords.get(j).selectedCent)
+                            - selectedCent % 1200;
                     break;
-                case -2400:
-                    selectedCent = selectedCent + 2400;
+                }
             }
+        }*/
+        //Store the curRecord in pastRecords
+        curRecord.selectedCent = selectedCent;
+        curRecord.points = maxPoints;
+        pastRecords.add(curRecord);
+        int historySize = 5;
+        if(pastRecords.size() > historySize) {
+            pastRecords.remove(0); // remove oldest.
         }
 
+        // Logging
         String centsStr = LogStr("cents", curRecord.cents);
         String acfsStr = LogStr("acfs", curRecord.acfs);
         String histPointStr = LogStr("histPoints", histPoints);
@@ -528,6 +539,7 @@ public class FrequencyAnalyzer {
         }
         return str;
     }
+
     private String LogStr(String prefix, float[] vals) {
         String str = "";
         DecimalFormat df = new DecimalFormat("###.##");
@@ -536,6 +548,7 @@ public class FrequencyAnalyzer {
         }
         return str;
     }
+
     // Step 3: Fine tune freq using ACF
     private double fineTuneStep3(double freq) {
         double inputFreq = freq;
@@ -767,6 +780,11 @@ public class FrequencyAnalyzer {
             acfMax = acfNow;
             prevDelta = delta;
         }
+        // If we find no peaks then bail out. this happens when signalPower is very low.
+        if(peakCents.size() < 1) {
+            return;
+        }
+
         ArrayList<Double> sortedAcfs = (ArrayList<Double>) peakAcfs.clone();
         Collections.sort(sortedAcfs, Collections.reverseOrder());
         // Find top 5 harmonics.

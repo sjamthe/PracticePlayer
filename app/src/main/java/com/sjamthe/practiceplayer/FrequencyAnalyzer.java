@@ -54,7 +54,7 @@ public class FrequencyAnalyzer {
     public static  String[] NOTES =
             new String[] {"C", "Db", "D", "Eb", "E", "F", "F#", "G", "Ab", "A", "Bb", "B"};
     public static final double FREQ_A1 = 55.0d;
-    static final double VOLUME_THRESHOLD = 5.0d; // 5.0 is default.
+    static final double VOLUME_THRESHOLD = 0.0d; // 5.0 is default.
     static final int ANALYZE_SAMPLES_PER_SECOND = 15; // can be a variable
     public static final double SEMITONE_INTERVAL = Math.pow(2.0d, 1.0d/12.0d); // 1.05946
     // Example:calculate any freq like C3 will be 12 (which is A2) +3 semitones from A1 or 130.8Hz
@@ -70,6 +70,7 @@ public class FrequencyAnalyzer {
     public static final double FREQ_MIN = FREQ_C1 - 5; // Min frequency we want to detect
 
     static double log2C1 = log2(FREQ_C1);
+    private double signalPower = 0; // Signal power
 
     public static double log2(double d) {
         return Math.log(d) / Math.log(2.0d);
@@ -184,7 +185,7 @@ public class FrequencyAnalyzer {
     }
 
     // Cumulative amplitude - this comes very close to acfdata[0]
-    private double sumSignal(short[] data) {
+    private double sumSignal(double[] data) {
         double sum = 0;
         if(data.length < 1) {
             return sum;
@@ -287,9 +288,9 @@ public class FrequencyAnalyzer {
         for (int i = analyzePos, j = 0; j < fftSize; i++, j++) {
             int pos = i % inputBuffer.length; // to support round robbin.
             signal[j] = inputBuffer[pos] * haanData[j] / Short.MAX_VALUE;
-  }
-
-        if(sumSignal(inputBuffer) >= this.threshold) {
+        }
+        signalPower = sumSignal(signal);
+        if(signalPower >= this.threshold) {
             fftData = signal.clone();
             // Get FFT for the data.
             fft.rdft(1, fftData); // Note: rdft does in-place replacement of fftData
@@ -372,12 +373,11 @@ public class FrequencyAnalyzer {
         Record curRecord = new Record();
         double selectedFreq = -1;
         double finalFreq = -1;
-        double signalPower = Math.sqrt(acfData[0]);
+        //double signalPower = Math.sqrt(acfData[0]);
 
         curRecord.pos = nPitches;
-        if (signalPower >= this.threshold) {
-            getTop5CentsFromAcf(curRecord);
-            // curRecord.acfs = getAcfsFromCents(curRecord.cents);
+        if (signalPower >= this.threshold) { // this check is happening earlier so not needed here
+            getTopNCentsFromAcf(curRecord);
         } else {
             double[] acfs = new double[] {-1, -1, -1, -1, -1};
             float[]  cents = new float[] {-1, -1, -1, -1, -1};
@@ -420,43 +420,47 @@ public class FrequencyAnalyzer {
     // Compare with future cents use matching futureCents ACF as points.
     private double selectCorrectPitch() {
         Record curRecord = futureRecords.remove(0); // Record we are selecting Pitch for.
-        double[] last5Cents = new double[5];
+        float[] last5Cents = new float[5];
         for (int i=1; i<=5; i++) {
             last5Cents[i - 1] = this.centBuffer[Math.abs(nPitches%pitchBuffer.length - i)];
         }
-        double[] points = new double[curRecord.cents.length];
+        double[] histPoints = new double[curRecord.cents.length];
+        double[] futurePoints = new double[curRecord.cents.length];
         for (int i=0; i<curRecord.cents.length; i++) {
-            double curPoint = 0;
-            double curCent = curRecord.cents[i];
-            if(curCent < 0) {
-                points[i] = curPoint;
+            float curCent = curRecord.cents[i];
+            histPoints[i] = 0;
+            futurePoints[i] = 0;
+            if(curCent <= 0) {
                 continue;
             }
             // Initialize points from ACF
-            curPoint = curRecord.acfs[i] * 2; // Bump-up weight of ACF
-            // Step 1: HISTORY POINTS - Weighted by how close in hisory
+            // points[i] = curRecord.acfs[i]; // So if there is no hist or future we select F0
+            // Step 1: HISTORY POINTS - Weighted by how close in history
             for (int j=0; j<last5Cents.length; j++) {
-                if(last5Cents[j] < 0) {
+                if(last5Cents[j] <= 0) {
                     continue;
                 }
-                double diff = Math.abs(curCent - last5Cents[j]);
-                if(diff <= 50) {
-                    curPoint += 2 * (last5Cents.length - j)/last5Cents.length * curRecord.acfs[i];
-                } else if (diff <= 1200) {
-                    curPoint += 1 * (last5Cents.length - j)/last5Cents.length * curRecord.acfs[i];
+                double diff = Math.abs(centToPerfectCent(curCent)
+                        - centToPerfectCent(last5Cents[j]));
+                float nearness = 1.0f*(last5Cents.length - j)/last5Cents.length;
+                if(diff == 0) { // We have seen this cent before
+                    histPoints[i] += 5.0 * nearness;
+                } else if (diff <= 1200) { // Not this cent but same octave gap.
+                    histPoints[i] += 2.0 * nearness;
                 } else if (diff <= 2400) {
-                    curPoint += 0.5 * (last5Cents.length - j)/last5Cents.length * curRecord.acfs[i];
+                    histPoints[i] += 0.5 * nearness;
                 }
             }
             // Step 2: FUTURE POINTS
             for (int j=0; j<futureRecords.size(); j++) {
+                float nearness = (5 - j); // We want 5 amd 4 values
                 float[] futureCents = futureRecords.get(j).cents;
                 double[] futureAcfs = futureRecords.get(j).acfs;
                 for (int k=0; k<futureCents.length; k++) {
                     if (futureCents[k] > 0 &&
-                            Math.abs(curRecord.cents[i] - futureCents[k]) <= 50) {
-                        curPoint += 2 * (futureRecords.size() - j) * futureAcfs[k]
-                                * (futureCents.length - k)/futureCents.length;
+                            Math.abs(centToPerfectCent(curRecord.cents[i])
+                                    - centToPerfectCent(futureCents[k])) == 0) {
+                        futurePoints[i] += 1.0f * nearness * futureAcfs[k];
                     }/*
                     else if (futureCents[k] > 0 &&
                             Math.abs(curRecord.cents[i] - futureCents[k]) <= 1200) {
@@ -465,83 +469,55 @@ public class FrequencyAnalyzer {
                     }*/
                 }
             }
-            points[i] = curPoint; // Got all the points
         }
-        float selectedCent = -1;
+
         // Record with highest point will be selected, if 0 points then -1
         double maxPoints = 0;
-        for (int i=0; i<points.length; i++) {
-            if(points[i] > maxPoints) {
+        int selectedIndex = -1;
+        float selectedCent = -1;
+        for (int i=0; i<histPoints.length; i++) {
+            double point = curRecord.acfs[i] + histPoints[i] + futurePoints[i];
+            if(point > maxPoints) {
+                selectedIndex = i;
                 selectedCent = curRecord.cents[i];
-                maxPoints = points[i];
+                maxPoints = point;
             }
         }
+        // If selectedCent is 1 or two octave higher than history then drop it to same octave
+        for (int i=0; i< last5Cents.length; i++) {
+            if(last5Cents[i] <= 0) {
+                continue;
+            }
+            int diff = centToPerfectCent(selectedCent)
+                    - centToPerfectCent(last5Cents[i]);
+            switch (diff) {
+                case 1200:
+                    selectedCent = selectedCent - 1200;
+                    break;
+                case -1200:
+                    selectedCent = selectedCent + 1200;
+                case 2400:
+                    selectedCent = selectedCent - 2400;
+                    break;
+                case -2400:
+                    selectedCent = selectedCent + 2400;
+            }
+        }
+
         String centsStr = LogStr("cents", curRecord.cents);
         String acfsStr = LogStr("acfs", curRecord.acfs);
-        String pointStr = LogStr("points", points);
+        String histPointStr = LogStr("histPoints", histPoints);
+        String futurePointStr = LogStr("futurePoints", futurePoints);
         DecimalFormat df = new DecimalFormat("###.##");
         Log.d("POINTS", nPitches +  ":maxPoints:" + df.format(maxPoints) +
-                ":selectedCent:" + df.format(selectedCent) +
-                centsStr + pointStr );
+                        ":power:" + df.format(Math.sqrt(acfData[0])) +
+                        ":Note:" + centToNote(selectedCent) +
+                        ":perfectCent:" + centToPerfectCent(selectedCent) +
+                        ":selectedIndex:" + selectedIndex +
+                        centsStr + histPointStr + futurePointStr + acfsStr
+        );
 
         return centToFreq(selectedCent);
-    }
-
-    // Look at harmonics of freqs[0]. Add all up with HPS and select one with max amp
-    // Always boosting freqs[1]
-    private double getPitchFromHPS(double[] freqs, double[] acfs) {
-        // Calculate new ACFs based on dot product of harmonica
-        /*
-        int i, j, maxSearchIndex, maxBin;
-        int harmonics = 5;
-        double[] spectrum = fftData.clone();
-        maxSearchIndex = spectrum.length/harmonics;
-
-        maxBin = 1;
-        for (j=1; j<=maxSearchIndex; j++) {
-            for (i=1; i<=harmonics; i++) {
-                spectrum[j] *= spectrum[j*i];
-            }
-            if (spectrum[j] > spectrum[maxBin]) {
-                maxBin = j;
-            }
-        }
-
-        // Fixing octave too high errors
-        int correctMaxBin = 1;
-        int maxsearch = maxBin * 3 / 4;
-        for (i=2; i<maxsearch; i++) {
-            if (spectrum[i] > spectrum[correctMaxBin]) {
-                correctMaxBin = i;
-            }
-        }*/
-        double selectedFreq = freqs[0];
-        // Octave errors are a common problem in pitch measurements from HPS. Almost always in
-        // these error cases, the pitch is detected one octave too high. To correct for this error,
-        // postprocessing should be done with the following rule: IF the second peak amplitude
-        // below initially chosen pitch is approximately 1/2 of the chosen pitch AND the ratio of
-        // amplitudes is above a threshold (e.g., 0.2 for 5 harmonics), THEN select the lower
-        // octave peak as the pitch
-        /*if(acfs[0]/acfs[1] > 0.2) {
-            selectedFreq = freqs[0];
-        }*/
-        /*
-        if (Math.abs(correctMaxBin * 2 - maxBin) < 4) {
-            if (spectrum[correctMaxBin]/spectrum[maxBin] > 0.2) {
-                maxBin = correctMaxBin;
-            }
-        }*/
-
-        String freqStr = LogStr("freqs", freqs);
-        String acfsStr = LogStr("acfs", acfs);
-        DecimalFormat df = new DecimalFormat("###.##");
-        Log.d("HPS", nPitches +  ":power:" + df.format(Math.sqrt(acfData[0])) +
-                ":Note:" + centToNote(freqToCent(selectedFreq)) +
-                ":Octave:" + centToOctave(freqToCent(selectedFreq)) +
-                ":selectedFreq:" + df.format(selectedFreq) +
-                freqStr + acfsStr);
-
-        return selectedFreq;
     }
 
     private String LogStr(String prefix, double[] vals) {
@@ -596,6 +572,7 @@ public class FrequencyAnalyzer {
 
     // Return square-root of the average of amplitudes (from fftdata) for
     // frequency given frequency and its nearest neighbours +-1
+    /*
     private double fftNearFreq(double freq) {
         // why have min & max based on Freq? why noy just +-1 ? this seems biased to higher freq
          int minLoc = (int) ((0.9791666666666666d * freq) / (samplingSize / fftData.length));
@@ -622,10 +599,11 @@ public class FrequencyAnalyzer {
        /* Log.d("ANALYZE", "avgAmp = " + avgAmp + " maxAmp = " + maxAmp +
                 " preMaxAmp = " + preMaxAmp + " postMaxAmp = " + postMaxAmp);
         Log.d("ANALYZE", "freq in = " + freq + " loc " + loc + " nearFftFreq = "
-                + nearFftFreq + " maxAmp " + maxAmp);*/
+                + nearFftFreq + " maxAmp " + maxAmp);
         return nearFftFreq;
-    }
+    }*/
 
+    /*
     // Step 2: Look at FFT Amplitudes to see if a harmonic should be the right freq. TODO: why?
     double fineTuneFreqWithFft(double freq) {
         double fftVal15 = -1; double fftVal20 = -1; double fftVal30 = -1;
@@ -663,10 +641,10 @@ public class FrequencyAnalyzer {
                     " fftVal:" + fftVal + " fftVal023:" + fftVal023 + " fftVal15:" + fftVal15 +
                     " fftVal20:" + fftVal20 + " fftVal30:" + fftVal30);
 
-        }*/
+        }
         return newFreq;
-    }
-
+    }*/
+/*
     double myfineTuneFreqWithFft(double freq) {
         double fftVal = fftNearFreq(freq);
         double newFreq = freq;
@@ -747,9 +725,10 @@ public class FrequencyAnalyzer {
     /*
     * Find the TOP 5 peak ACF in our interest range, return freq in desc order of ACF
      */
-    private void getTop5CentsFromAcf(Record record) {
-        record.acfs = new double[]{-1, -1, -1, -1, -1};
-        record.cents = new float[]{-1, -1, -1, -1, -1};
+    private void getTopNCentsFromAcf(Record record) {
+        int topN = 5;
+        record.acfs = new double[topN];
+        record.cents = new float[topN];
         ArrayList<Float> peakCents = new ArrayList<Float>();
         ArrayList<Double> peakAcfs =new ArrayList<Double>();
         int scanLimit = 5; // Look up to these many tranches in acf data
@@ -792,29 +771,24 @@ public class FrequencyAnalyzer {
         Collections.sort(sortedAcfs, Collections.reverseOrder());
         // Find top 5 harmonics.
         int counter=0;
-        // double top1Freq = peakFreqs.get(peakAcfs.indexOf(sortedAcfs.get(0)));
         float top1Cent = peakCents.get(peakAcfs.indexOf(sortedAcfs.get(0)));
         // sometimes top2freq is not a harmonic of top1, in that case we get harmonics for top2freq
         // double top2Freq = -1;
         float top2Cent = -1;
         if(sortedAcfs.size() > 1) {
-            // peakFreqs.get(peakAcfs.indexOf(sortedAcfs.get(1)));
             top2Cent = peakCents.get(peakAcfs.indexOf(sortedAcfs.get(1)));
         }
         boolean freq1IsHarmonic = false;
         boolean freq2IsHarmonic = false;
         for(int i=0; i < sortedAcfs.size(); i++) {
             int index = peakAcfs.indexOf(sortedAcfs.get(i));
-            // double freq = peakFreqs.get(index);
             float cent = peakCents.get(index);
             freq1IsHarmonic = isHarmonic(top1Cent, cent);
             freq2IsHarmonic = isHarmonic(top2Cent, cent);
             if (i == 0 || freq1IsHarmonic || freq2IsHarmonic) {
-                //top5freqs[counter] = freq;
                 record.cents[counter] = cent;
                 record.acfs[counter++] = sortedAcfs.get(i);
-
-                if(counter >= 5) {
+                if(counter >= record.cents.length) {
                     break;
                 }
             }
@@ -823,7 +797,10 @@ public class FrequencyAnalyzer {
 
     // Return true is freq is a harmonic of f0
     private boolean isHarmonic(float cent0, float cent) {
-        float ratio = cent/cent0;
+        if(centToPerfectCent(cent0) == 0)
+            return false;
+
+        float ratio = centToPerfectCent(cent)/centToPerfectCent(cent0);
         if (ratio < 1) {
             ratio = 1 / ratio;
         }
@@ -867,6 +844,7 @@ public class FrequencyAnalyzer {
     /*
      * Find the peak amplitude (ACF) near a given frequency.
      */
+    /*
     private double[] getAcfsFromCents(float cents[]) {
         int scanLimit = 2; // Look up to these many neighbours on both sides in acf data
         double[] acfs = new double[cents.length];
@@ -887,7 +865,7 @@ public class FrequencyAnalyzer {
             }
         }
         return acfs;
-    }
+    }*/
 /*
     private void chartData(float[] psData) {
         List<Entry> list = new ArrayList<>();

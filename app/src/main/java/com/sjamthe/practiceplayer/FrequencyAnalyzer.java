@@ -51,7 +51,7 @@ public class FrequencyAnalyzer {
     private final PitchDetector detector;
     FullscreenActivity fullscreenActivity;
 
-    static final double VOLUME_THRESHOLD = 30.0d; // 5.0 is default.
+    static final double VOLUME_THRESHOLD = 0.0d; // 5.0 is default.
 
     public static  String[] NOTES =
             new String[] {"C", "Db", "D", "Eb", "E", "F", "F#", "G", "Ab", "A", "Bb", "B"};
@@ -71,7 +71,7 @@ public class FrequencyAnalyzer {
     public static final double FREQ_MIN = FREQ_C1 - 5; // Min frequency we want to detect
 
     static double log2C1 = log2(FREQ_C1);
-    private double signalPower = 0; // Signal power
+    private double soundLevel = 0; // Signal power
 
     public static double log2(double d) {
         return Math.log(d) / Math.log(2.0d);
@@ -188,17 +188,16 @@ public class FrequencyAnalyzer {
         notesCounter.put(perfectNote, count+1);
     }
 
-    // Cumulative amplitude - this comes very close to acfdata[0]
-    private double sumSignal(double[] data) {
+    // Calculate Sound level as RMS of amplitude
+    private double signalRMS(double[] data) {
         double sum = 0;
         if(data.length < 1) {
             return sum;
         }
-
         for (int i=0; i< data.length; i++) {
-            sum += Math.abs(data[i]);
+            sum += data[i]*data[i];
         }
-        return sum;
+        return Math.sqrt(sum/data.length);
     }
 
     public String getSongKey() {
@@ -293,8 +292,8 @@ public class FrequencyAnalyzer {
             int pos = i % inputBuffer.length; // to support round robbin.
             signal[j] = inputBuffer[pos] * haanData[j] / Short.MAX_VALUE;
         }
-        signalPower = sumSignal(signal);
-        if(signalPower >= this.threshold) {
+        soundLevel = signalRMS(signal);
+        if(soundLevel >= this.threshold) {
             fftData = signal.clone();
             // Get FFT for the data.
             fft.rdft(1, fftData); // Note: rdft does in-place replacement of fftData
@@ -377,16 +376,16 @@ public class FrequencyAnalyzer {
         Record curRecord = new Record();
         double selectedFreq = -1;
         double finalFreq = -1;
-        //double signalPower = Math.sqrt(acfData[0]);
-
+        // Initialize record.
+        double[] acfs = new double[] {-1, -1, -1, -1, -1};
+        float[]  cents = new float[] {-1, -1, -1, -1, -1};
+        curRecord.cents = cents;
+        curRecord.acfs = acfs;
+        curRecord.selectedCent = -1;
         curRecord.pos = nPitches;
-        if (signalPower >= this.threshold) { // this check is happening earlier so not needed here
+
+        if (soundLevel >= this.threshold) { // this check is happening earlier so not needed here
             getTopNCentsFromAcf(curRecord);
-        } else {
-            double[] acfs = new double[] {-1, -1, -1, -1, -1};
-            float[]  cents = new float[] {-1, -1, -1, -1, -1};
-            curRecord.cents = cents;
-            curRecord.acfs = acfs;
         }
         futureRecords.add(curRecord);
         if(futureRecords.size() > 2) {
@@ -424,6 +423,8 @@ public class FrequencyAnalyzer {
     // Compare with future cents use matching futureCents ACF as points.
     private double selectCorrectPitch() {
         double minPointLimit = 0.0; // If points are below this we have low confidence
+        int historySize = 2;
+
         Record curRecord = futureRecords.remove(0); // Record we are selecting Pitch for.
         double[] histPoints = new double[curRecord.cents.length];
         double[] futurePoints = new double[curRecord.cents.length];
@@ -537,7 +538,6 @@ public class FrequencyAnalyzer {
         curRecord.selectedCent = selectedCent;
         curRecord.points = maxPoints;
         pastRecords.add(curRecord);
-        int historySize = 5;
         if(pastRecords.size() > historySize) {
             pastRecords.remove(0); // remove oldest.
         }

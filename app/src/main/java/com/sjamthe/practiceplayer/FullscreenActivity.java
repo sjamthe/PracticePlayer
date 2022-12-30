@@ -52,6 +52,7 @@ public class FullscreenActivity extends AppCompatActivity {
     private TextView markerStartPosition;
     private TextView markerStopPosition;
     private TextView lastCents;
+    private MaterialButton micButton;
     private MaterialButton fileButton;
     private MaterialButton playButton;
     private MaterialButton markerButton;
@@ -134,14 +135,11 @@ public class FullscreenActivity extends AppCompatActivity {
     String getFileName(Uri uri) {
         String result = null;
         if (uri.getScheme().equals("content")) {
-            Cursor cursor = getContentResolver().query(uri, null, null,
-                    null, null);
-            try {
+            try (Cursor cursor = getContentResolver().query(uri, null, null,
+                    null, null)) {
                 if (cursor != null && cursor.moveToFirst()) {
                     result = cursor.getString(cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME));
                 }
-            } finally {
-                cursor.close();
             }
         }
         if (result == null) {
@@ -226,7 +224,7 @@ public class FullscreenActivity extends AppCompatActivity {
         return set;
     }
 
-    void updateChart(float dataIn) {
+    void updateChart(float dataIn, String[] songKey) {
         LineData lineData = lineChart.getData();
         if(lineData == null) {
             createChart();
@@ -250,11 +248,12 @@ public class FullscreenActivity extends AppCompatActivity {
         lineChart.moveViewToX(lineData.getEntryCount()); // no lines if disabled
 
         if(dataIn > 0) {
-            lastCents.setText(FrequencyAnalyzer.NOTES[FrequencyAnalyzer.centToNote(dataIn)] +
-                    String.valueOf(FrequencyAnalyzer.centToOctave(dataIn)));
+            lastCents.setText(String.format("%s%s key:%s%s",
+                    FrequencyAnalyzer.NOTES[FrequencyAnalyzer.centToNote(dataIn)],
+                    FrequencyAnalyzer.centToOctave(dataIn),songKey[1], songKey[2]));
             lastCents.setVisibility(View.VISIBLE);
         } else {
-            lastCents.setText("--");
+            lastCents.setText(String.format("-- key:%s%s", songKey[1], songKey[2]));
         }
     }
 
@@ -295,7 +294,8 @@ public class FullscreenActivity extends AppCompatActivity {
     private final Runnable mHideRunnable = new Runnable() {
         @Override
         public void run() {
-            hide();
+            // hide(); // This is startup state of buttons. we want them to show
+            show();
         }
     };
     /**
@@ -377,6 +377,16 @@ public class FullscreenActivity extends AppCompatActivity {
         // binding.playButton.setOnTouchListener(mDelayHideTouchListener);
 
         // initialize all variables with their layout items.
+        micButton = findViewById(R.id.mic_button);
+        micButton.setCheckable(true);
+        micButton.setToggleCheckedStateOnClick(true);
+        micButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                toggleMic();
+            }
+        });
+
         fileButton = findViewById(R.id.file_button);
         fileButton.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -513,6 +523,16 @@ public class FullscreenActivity extends AppCompatActivity {
             setMarkerStopPosition(player.presentationTimeUs);
         } else {
             resetMarkerPositions();
+        }
+    }
+
+    private void toggleMic() {
+        if(micButton.isToggleCheckedStateOnClick()) {
+            if(micButton.isChecked()) {
+                micButton.setIconResource(R.drawable.ic_baseline_mic_off_24);
+            } else {
+                micButton.setIconResource(R.drawable.ic_baseline_mic_on_24);
+            }
         }
     }
 

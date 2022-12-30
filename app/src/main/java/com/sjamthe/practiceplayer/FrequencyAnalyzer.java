@@ -8,12 +8,7 @@ import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.OptionalDouble;
-
-import be.tarsos.dsp.pitch.McLeodPitchMethod;
-import be.tarsos.dsp.pitch.PitchDetectionResult;
-import be.tarsos.dsp.pitch.PitchDetector;
 
 /*
 Find Pitch using ACF (Auto Correlation Function)
@@ -48,10 +43,10 @@ https://github.com/cuthbertLab/music21/blob/master/music21/analysis/discrete.py
  */
 
 public class FrequencyAnalyzer {
-    private final PitchDetector detector;
+    // private final PitchDetector detector;
     FullscreenActivity fullscreenActivity;
 
-    static final double VOLUME_THRESHOLD = 0.0d; // 5.0 is default.
+    static final double VOLUME_THRESHOLD = 0.0;
 
     public static  String[] NOTES =
             new String[] {"C", "Db", "D", "Eb", "E", "F", "F#", "G", "Ab", "A", "Bb", "B"};
@@ -92,12 +87,16 @@ public class FrequencyAnalyzer {
     short [] inputBuffer;
     double [] pitchBuffer; // how many pitches do we store? one pitch per analyze call.
     float [] centBuffer; // Stores Pitch converted to log2 scale and relative to FREQ_MIN
+    double[] notesDistribution; // Counter for each of the 12 notes
+    int [][] octaveNotesDistribution = new int[8][12];
     float lastCent;
+    public String[] songKey = new String[] {"","",""};
+
     // float displayCent;
     double averageCent = 0;
     double nCents = 0;
     // Hashmap to store perfectCent as key and # of occurrence as value.
-    HashMap<Integer, Integer> notesCounter = new HashMap<Integer, Integer>();
+    // HashMap<Integer, Integer> notesCounter = new HashMap<Integer, Integer>();
     private int nPitches = 0;
 
     int inputPos = 0;
@@ -174,7 +173,7 @@ public class FrequencyAnalyzer {
             return -1;
         return Math.round(cent/1200) + 1; // Each Octave has 1200 cents;
     }
-
+/*
     void addNoteToNotesCounter(double freq) {
         if(freq < 0)
             return;
@@ -187,7 +186,7 @@ public class FrequencyAnalyzer {
         }
         notesCounter.put(perfectNote, count+1);
     }
-
+*/
     // Calculate Sound level as RMS of amplitude
     private double signalRMS(double[] data) {
         double sum = 0;
@@ -197,24 +196,121 @@ public class FrequencyAnalyzer {
         for (int i=0; i< data.length; i++) {
             sum += data[i]*data[i];
         }
-        return Math.sqrt(sum/data.length);
+        return Math.sqrt(sum/data.length)*100;
     }
 
-    public String getSongKey() {
-        String songKey = "";
-        Integer largestKey = null;
-        int largestValue = Integer.MIN_VALUE;
-        for (Integer key : notesCounter.keySet()) {
-            if (notesCounter.get(key) > largestValue) {
-                largestKey = key;
-                largestValue = notesCounter.get(key);
+    // Returns array with [scale, key, octave]
+    public String[] getSongKey() {
+        // double[] keyResultsMajor = convoluteDistribution("major");
+        // double[] keyResultsMinor = convoluteDistribution("minor");
+        double[] differenceMajor = getDifference("major");
+        double[] differenceMinor = getDifference("minor");
+        // Find the key for major and minor. The key is the one with max convoluteDistribution
+        // Key with the largest difference (Major or Minor) is the key
+        double largestValue = -1.0*Double.MAX_VALUE;
+        String scale = "major";
+        int largestKey = -1;
+        for (int i=0; i<differenceMajor.length; i++) {
+            if (differenceMajor[i] > largestValue) {
+                largestValue = differenceMajor[i];
+                largestKey = i;
+                scale = "major";
             }
         }
-        if(largestValue > 0) {
-            songKey = FrequencyAnalyzer.NOTES[FrequencyAnalyzer.centToNote(largestKey)] +
-                    String.valueOf(FrequencyAnalyzer.centToOctave(largestKey));
+        for (int i=0; i<differenceMinor.length; i++) {
+            if (differenceMinor[i] > largestValue) {
+                largestValue = differenceMinor[i];
+                largestKey = i;
+                scale = "minor";
+            }
+        }
+        if(largestKey >= 0) {
+            // Find the octave that has max freq for this key
+            int maxOctave = this.octaveNotesDistribution.length;
+            int largestOctaveValue = Integer.MIN_VALUE;
+            int octave = -1;
+            for (int i=0; i<maxOctave; i++) {
+                if(this.octaveNotesDistribution[i][largestKey] > largestOctaveValue) {
+                    largestOctaveValue = this.octaveNotesDistribution[i][largestKey];
+                    octave = i + 1; // C1 is 0 octave for us.
+                }
+            }
+            songKey[0] = scale;
+            songKey[1] = FrequencyAnalyzer.NOTES[largestKey];
+            songKey[2] = String.valueOf(octave);
         }
         return songKey;
+    }
+
+    // Function that returns weight constants got from research.
+    // source: music21/analysis/discrete.py
+    // http://extras.humdrum.org/man/keycor/
+    // TODO (sjamthe) modified for ragas
+    public double[] getWeightConstants(String weightType) {
+        if (weightType.toLowerCase().equals("major")) {
+            return new double[]{6.35, 2.23, 3.48, 2.33, 4.38, 4.09, 2.52, 5.19, 2.39, 3.66, 2.29, 2.88};
+        } else if (weightType.toLowerCase().equals("minor")) {
+            return new double[]{6.33, 2.68, 3.52, 5.38, 2.60, 3.53, 2.54, 4.75, 3.98, 2.69, 3.34, 3.17};
+        } else {
+            return new double[]{0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+        }
+    }
+
+    // source: music21/analysis/discrete.py
+    // reference: https://labs.la.utexas.edu/gilden/files/2016/04/temperley-maai.pdf
+    // The key yielding the maximum correlation (convolute here) value is the preferred key
+    public double[] convoluteDistribution(String weightType) {
+        double[] solution = new double[]{0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+        double[] toneWeights = getWeightConstants(weightType);
+        for (int i=0; i<12; i++) {
+            for (int j=0; j<12; j++) {
+                solution[i] += toneWeights[Math.abs(j - i) % 12] * this.notesDistribution[j];
+            }
+        }
+        return solution;
+    }
+
+    // Takes in a list of numerical probable key results and returns the difference of the
+    // top two keys.
+    // source: music21/analysis/discrete.py
+    public double[] getDifference(String weightType) {
+        double[] solution = new double[]{0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+        double[] top = new double[]{0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+        double[] bottomR = new double[]{0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+        double[] bottomL = new double[]{0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+        double[] toneWeights = getWeightConstants(weightType);
+        double profileAverage = averageOfArray(toneWeights);
+        double histogramAverage = averageOfArray(this.notesDistribution);
+        for (int i = 0; i < 12; i++) {
+            for (int j = 0; j < 12; j++) {
+                top[i] = top[i] + ((
+                        toneWeights[Math.abs(j - i) % 12] - profileAverage) * (
+                        this.notesDistribution[j] - histogramAverage));
+
+                bottomR[i] = bottomR[i] + (Math.pow(
+                        toneWeights[Math.abs(j - i) % 12] - profileAverage,2));
+                bottomL[i] = bottomL[i] + (Math.pow(
+                        this.notesDistribution[j] - histogramAverage, 2));
+
+                if (bottomR[i] == 0 || bottomL[i] == 0) {
+                    solution[i] = 0;
+                } else {
+                    solution[i] = (double) (top[i]) / Math.sqrt(bottomR[i] * bottomL[i]);
+                }
+            }
+        }
+        return solution;
+    }
+
+    private double averageOfArray(double[] array) {
+        double average = 0;
+        for (int i=0; i<array.length; i++) {
+            average += array[i];
+        }
+        if(array.length > 0)
+            average = average/array.length;
+
+        return average;
     }
 
     public FrequencyAnalyzer(double samplingSize) {
@@ -229,15 +325,16 @@ public class FrequencyAnalyzer {
         // this.playData = new short[this.inputBuffer.length];
         this.pitchBuffer = new double[(int) (30.0*this.samplingSize/this.analyzeSize)];
         this.centBuffer = new float[this.pitchBuffer.length];
+        this.notesDistribution = new double[]{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
         fft = new FFT4g(this.fftSize);
 
-        detector = new McLeodPitchMethod((float) this.samplingSize, this.fftSize);// better than Yin
+        // detector = new McLeodPitchMethod((float) this.samplingSize, this.fftSize);// better than Yin
     }
 
     private final Runnable runUpdateChart = new Runnable() {
         @Override
         public void run() {
-            fullscreenActivity.updateChart(lastCent);
+            fullscreenActivity.updateChart(lastCent, songKey);
         }
     };
 
@@ -306,15 +403,15 @@ public class FrequencyAnalyzer {
             pitch = findPitch();
         }
         pitchBuffer[nPitches%pitchBuffer.length] = pitch;
-        addNoteToNotesCounter(pitch); // Add Note to the notesCounter;
+        // addNoteToNotesCounter(pitch); // Add Note to the notesCounter;
 
+        /*
         float yinPitch = -1;
         float yinProb = -1;
         PitchDetectionResult yinResult = null;
         float[] sigCopy = new float[fftSize];
         for (int i=0; i< sigCopy.length; i++)
             sigCopy[i] = (float) signal[i];
-/*
         yinResult = detector.getPitch(sigCopy);
         if(yinResult != null) {
             yinPitch = yinResult.getPitch();
@@ -327,12 +424,15 @@ public class FrequencyAnalyzer {
         if (pitch > 0) {
             averageCent = (averageCent*nCents + lastCent)/(nCents + 1);
             nCents++;
+            notesDistribution[centToNote(lastCent)]++;
+            octaveNotesDistribution[centToOctave(lastCent)-1][centToNote(lastCent)]++;
         }
         centBuffer[nPitches%pitchBuffer.length] = lastCent;
         nPitches++;
 
-        if(nPitches%500 == 0) {
-            Log.i("KEY", "SongKey:" + getSongKey());
+        if(nPitches%100 == 0) {
+            getSongKey();
+            Log.i("KEY", "SongKey:" + songKey[0] + ":" + songKey[1] + songKey[2]);
         }
 
         if(fullscreenActivity != null && fullscreenActivity.fullScreenHandler != null)
@@ -549,7 +649,7 @@ public class FrequencyAnalyzer {
         String futurePointStr = LogStr("futurePoints", futurePoints);
         DecimalFormat df = new DecimalFormat("###.##");
         Log.d("POINTS", nPitches +  ":maxPoints:" + df.format(maxPoints) +
-                        ":power:" + df.format(Math.sqrt(acfData[0])) +
+                        ":soundLevel:" + df.format(soundLevel) +
                         ":Note:" + centToNote(selectedCent) +
                         ":perfectCent:" + centToPerfectCent(selectedCent) +
                         ":selectedIndex:" + selectedIndex +

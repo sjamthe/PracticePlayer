@@ -110,6 +110,17 @@
             tools:ignore="UselessParent">
 
             <com.google.android.material.button.MaterialButton
+                android:id="@+id/mic_button"
+                style="@style/Widget.MaterialComponents.Button.Icon"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:contentDescription="@string/mic_button"
+                android:text=""
+                app:icon="@drawable/ic_baseline_mic_on_24"
+                app:iconGravity="textStart"/>
+
+            <com.google.android.material.button.MaterialButton
                 android:id="@+id/file_button"
                 style="@style/Widget.MaterialComponents.Button.Icon"
                 android:layout_width="0dp"

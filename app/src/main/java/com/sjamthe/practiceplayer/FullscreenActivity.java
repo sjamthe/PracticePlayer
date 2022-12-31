@@ -224,7 +224,7 @@ public class FullscreenActivity extends AppCompatActivity {
         return set;
     }
 
-    void updateChart(float dataIn, String[] songKey) {
+    void updateChart(float cent, float songCent) {
         LineData lineData = lineChart.getData();
         if(lineData == null) {
             createChart();
@@ -235,7 +235,7 @@ public class FullscreenActivity extends AppCompatActivity {
             set = createSet();
             lineData.addDataSet(set);
         }
-        set.addEntry(new Entry(set.getEntryCount(), dataIn));
+        set.addEntry(new Entry(set.getEntryCount(), cent));
 
         // it may not ber necessary to refresh at every point
         lineData.notifyDataChanged();
@@ -246,14 +246,22 @@ public class FullscreenActivity extends AppCompatActivity {
 
         // move to the latest entry
         lineChart.moveViewToX(lineData.getEntryCount()); // no lines if disabled
+        lastCents.setVisibility(View.VISIBLE);
 
-        if(dataIn > 0) {
+        if(cent > 0 && songCent >= 0) {
             lastCents.setText(String.format("%s%s key:%s%s",
-                    FrequencyAnalyzer.NOTES[FrequencyAnalyzer.centToNote(dataIn)],
-                    FrequencyAnalyzer.centToOctave(dataIn),songKey[1], songKey[2]));
-            lastCents.setVisibility(View.VISIBLE);
-        } else {
-            lastCents.setText(String.format("-- key:%s%s", songKey[1], songKey[2]));
+                    FrequencyAnalyzer.NOTES[FrequencyAnalyzer.centToNote(cent)],
+                    FrequencyAnalyzer.centToOctave(cent),
+                    FrequencyAnalyzer.NOTES[FrequencyAnalyzer.centToNote(songCent)],
+                    FrequencyAnalyzer.centToOctave(songCent)));
+        } else if (songCent >= 0){
+            lastCents.setText(String.format("-- key:%s%s",
+                    FrequencyAnalyzer.NOTES[FrequencyAnalyzer.centToNote(songCent)],
+                    FrequencyAnalyzer.centToOctave(songCent)));
+        } else if(cent > 0) {
+            lastCents.setText(String.format("%s%s key:--",
+                    FrequencyAnalyzer.NOTES[FrequencyAnalyzer.centToNote(cent)],
+                    FrequencyAnalyzer.centToOctave(cent)));
         }
     }
 

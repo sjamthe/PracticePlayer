@@ -46,7 +46,7 @@ public class FrequencyAnalyzer {
     // private final PitchDetector detector;
     FullscreenActivity fullscreenActivity;
 
-    static final double VOLUME_THRESHOLD = 0.0;
+    static final double VOLUME_THRESHOLD = 1200.0;
 
     public static  String[] NOTES =
             new String[] {"C", "Db", "D", "Eb", "E", "F", "F#", "G", "Ab", "A", "Bb", "B"};
@@ -66,7 +66,6 @@ public class FrequencyAnalyzer {
     public static final double FREQ_MIN = FREQ_C1 - 5; // Min frequency we want to detect
 
     static double log2C1 = log2(FREQ_C1);
-    private double soundLevel = 0; // Signal power
 
     public static double log2(double d) {
         return Math.log(d) / Math.log(2.0d);
@@ -76,6 +75,7 @@ public class FrequencyAnalyzer {
         int pos;
         float[] cents;
         double[] acfs;
+        double soundLevel;
         float selectedCent; // the cents that was finally selected.
         double points; // Points acquired
     };
@@ -89,8 +89,12 @@ public class FrequencyAnalyzer {
     float [] centBuffer; // Stores Pitch converted to log2 scale and relative to FREQ_MIN
     double[] notesDistribution; // Counter for each of the 12 notes
     int [][] octaveNotesDistribution = new int[8][12];
+    double soundLevel = 0; // Signal power
+    double totalSoundLevel = 0;
     float lastCent;
-    public String[] songKey = new String[] {"","",""};
+    int songOctave; // Either set by user or octave of the song key
+    float songCent = -1;
+    // public String[] songKey = new String[] {"","",""};
 
     // float displayCent;
     double averageCent = 0;
@@ -165,13 +169,18 @@ public class FrequencyAnalyzer {
         if(cent < 0)
             return -1;
         return Math.round(cent/100)%12;
-        // String strNote = notes[note] + octave;
     }
 
     public static int centToOctave(float cent) {
         if(cent < 0)
             return -1;
-        return Math.round(cent/1200) + 1; // Each Octave has 1200 cents;
+        return (int)(cent/1200) + 1; // Each Octave has 1200 cents;
+    }
+
+    public static float octaveToCent(int octave) {
+        if(octave < 0)
+            return -1;
+        return (octave -1)*1200; // Each Octave has 1200 cents;
     }
 /*
     void addNoteToNotesCounter(double freq) {
@@ -196,11 +205,16 @@ public class FrequencyAnalyzer {
         for (int i=0; i< data.length; i++) {
             sum += data[i]*data[i];
         }
-        return Math.sqrt(sum/data.length)*100;
+        // return Math.sqrt(sum/data.length)*100;
+        sum = Math.sqrt(sum/data.length);
+        return sum;
     }
 
     // Returns array with [scale, key, octave]
-    public String[] getSongKey() {
+    public void setSongKey() {
+        if(nCents < 100)
+            return;
+
         // double[] keyResultsMajor = convoluteDistribution("major");
         // double[] keyResultsMinor = convoluteDistribution("minor");
         double[] differenceMajor = getDifference("major");
@@ -209,37 +223,35 @@ public class FrequencyAnalyzer {
         // Key with the largest difference (Major or Minor) is the key
         double largestValue = -1.0*Double.MAX_VALUE;
         String scale = "major";
-        int largestKey = -1;
+        int songKey = -1;
         for (int i=0; i<differenceMajor.length; i++) {
             if (differenceMajor[i] > largestValue) {
                 largestValue = differenceMajor[i];
-                largestKey = i;
+                songKey = i;
                 scale = "major";
             }
         }
         for (int i=0; i<differenceMinor.length; i++) {
             if (differenceMinor[i] > largestValue) {
                 largestValue = differenceMinor[i];
-                largestKey = i;
+                songKey = i;
                 scale = "minor";
             }
         }
-        if(largestKey >= 0) {
+        if(songKey >= 0) {
             // Find the octave that has max freq for this key
             int maxOctave = this.octaveNotesDistribution.length;
-            int largestOctaveValue = Integer.MIN_VALUE;
+            int max = Integer.MIN_VALUE;
             int octave = -1;
             for (int i=0; i<maxOctave; i++) {
-                if(this.octaveNotesDistribution[i][largestKey] > largestOctaveValue) {
-                    largestOctaveValue = this.octaveNotesDistribution[i][largestKey];
-                    octave = i + 1; // C1 is 0 octave for us.
+                if(this.octaveNotesDistribution[i][songKey] > max) {
+                    max = this.octaveNotesDistribution[i][songKey];
+                    octave = i + 1; // C1 is 0 for us.
                 }
             }
-            songKey[0] = scale;
-            songKey[1] = FrequencyAnalyzer.NOTES[largestKey];
-            songKey[2] = String.valueOf(octave);
+            this.songOctave = octave;
+            this.songCent = octaveToCent(this.songOctave) + songKey*100;
         }
-        return songKey;
     }
 
     // Function that returns weight constants got from research.
@@ -334,7 +346,7 @@ public class FrequencyAnalyzer {
     private final Runnable runUpdateChart = new Runnable() {
         @Override
         public void run() {
-            fullscreenActivity.updateChart(lastCent, songKey);
+            fullscreenActivity.updateChart(lastCent, songCent);
         }
     };
 
@@ -384,14 +396,17 @@ public class FrequencyAnalyzer {
         // Prepare data to analyze
         double pitch = -1;
         signal = new double[fftSize];
+        double[] haanSignal = new double[fftSize];
 
         for (int i = analyzePos, j = 0; j < fftSize; i++, j++) {
             int pos = i % inputBuffer.length; // to support round robbin.
-            signal[j] = inputBuffer[pos] * haanData[j] / Short.MAX_VALUE;
+            signal[j] = inputBuffer[pos];
+            haanSignal[j] = signal[j] * haanData[j] / Short.MAX_VALUE;
         }
         soundLevel = signalRMS(signal);
-        if(soundLevel >= this.threshold) {
-            fftData = signal.clone();
+        totalSoundLevel += soundLevel;
+        if(soundLevel >= this.threshold && soundLevel >= totalSoundLevel/(nPitches+1)/2) {
+            fftData = haanSignal.clone();
             // Get FFT for the data.
             fft.rdft(1, fftData); // Note: rdft does in-place replacement of fftData
             //Get PowerSpectrum
@@ -430,9 +445,9 @@ public class FrequencyAnalyzer {
         centBuffer[nPitches%pitchBuffer.length] = lastCent;
         nPitches++;
 
-        if(nPitches%100 == 0) {
-            getSongKey();
-            Log.i("KEY", "SongKey:" + songKey[0] + ":" + songKey[1] + songKey[2]);
+        if(nCents%100 == 0) {
+            setSongKey();
+            // Log.i("KEY", "SongKey:" + songKey[0] + ":" + songKey[1] + songKey[2]);
         }
 
         if(fullscreenActivity != null && fullscreenActivity.fullScreenHandler != null)
@@ -481,17 +496,18 @@ public class FrequencyAnalyzer {
         float[]  cents = new float[] {-1, -1, -1, -1, -1};
         curRecord.cents = cents;
         curRecord.acfs = acfs;
+        curRecord.soundLevel = this.soundLevel;
         curRecord.selectedCent = -1;
         curRecord.pos = nPitches;
 
-        if (soundLevel >= this.threshold) { // this check is happening earlier so not needed here
-            getTopNCentsFromAcf(curRecord);
-        }
+        getTopNCentsFromAcf(curRecord);
         futureRecords.add(curRecord);
         if(futureRecords.size() > 2) {
             // We have at least 3 records so we can find Pitch for N-2
             // Step 2: Select pitch based on last 2 pitches, and future two pitch choices.
-            selectedFreq = selectCorrectPitch();
+            Record analyzeRecord = futureRecords.remove(0); // Record we are selecting Pitch for.
+            // selectedFreq = selectCorrectPitch(analyzeRecord);
+            selectedFreq = selectCorrectNote(analyzeRecord);
             // Step 3: Fine tune step2 freq using ACF
             finalFreq = fineTuneStep3(selectedFreq);
         };
@@ -516,16 +532,151 @@ public class FrequencyAnalyzer {
         return finalFreq;
     }
 
+    // Use points system to select correct Note (ignore octave)
+    private double selectCorrectNote(Record curRecord) {
+        double minPointLimit = 0.0; // If points are below this we have low confidence
+        int historySize = 2;
+
+        double[] histPoints = new double[curRecord.cents.length];
+        double[] futurePoints = new double[curRecord.cents.length];
+        // Initialize
+        for (int i = 0; i < curRecord.cents.length; i++) {
+            float curCent = curRecord.cents[i];
+            histPoints[i] = 0;
+            futurePoints[i] = 0;
+            if (curCent <= 0) {
+                continue;
+            }
+            // Step 1: HISTORY POINTS - Weighted by how close in history
+            for (int j=0; j<pastRecords.size(); j++) {
+                float nearness = (j + 1.0f)/pastRecords.size(); // higher numbers in pastRecords are closer to current.
+                float[] pastCents = pastRecords.get(j).cents;
+                double[] pastAcfs = pastRecords.get(j).acfs;
+                double soundDiffRatio = Math.abs(curRecord.soundLevel
+                        - pastRecords.get(j).soundLevel) / pastRecords.get(j).soundLevel;
+                for (int k=0; k<pastCents.length; k++) {
+                    double diff = Math.abs(centToNote(curCent)
+                            - centToNote(pastCents[k]));
+                    // Same note as in history and same soundLevel gets points.
+                    if (pastCents[k] > 0 && diff == 0) {
+                        histPoints[i] += 1.0f * nearness * Math.pow(pastAcfs[k], 2);
+                    }
+                }
+                // Give some weight to the last selected Cent (not Note).
+                if(pastRecords.get(j).points >= minPointLimit) {
+                    double diff = Math.abs(centToPerfectCent(curCent)
+                            - centToPerfectCent(pastRecords.get(j).selectedCent));
+                    // Points if frequency has history
+                    if (diff == 0) {
+                        histPoints[i] += 1.0f * nearness;
+                    }
+                    // More points if frequency is withing 1/2 octave
+                    if (diff < 600) { // points for closer pitches
+                        histPoints[i] += 0.1f * nearness; // additional point is same freq, else only one.
+                    }
+                }
+            }
+            // Step 2: FUTURE POINTS
+            for (int j=0; j<futureRecords.size(); j++) {
+                float nearness = (5.0f - j)/futureRecords.size(); // We want 5 amd 4 values
+                float[] futureCents = futureRecords.get(j).cents;
+                double[] futureAcfs = futureRecords.get(j).acfs;
+                double soundDiffRatio = Math.abs(curRecord.soundLevel
+                        - futureRecords.get(j).soundLevel) / futureRecords.get(j).soundLevel;
+                for (int k=0; k<futureCents.length; k++) {
+                    double diff = Math.abs(centToNote(curCent)
+                            - centToNote(futureCents[k]));
+                    if (futureCents[k] >= 0 && diff == 0) {
+                        futurePoints[i] += 1.0f * nearness * Math.pow(futureAcfs[k], 2);
+                    }
+                }
+            }
+        }
+        // Record with highest point will be selected, if 0 points then -1
+        double maxPoints = 0;
+        int selectedIndex = -1;
+        float selectedCent = -1;
+        for (int i=0; i<histPoints.length; i++) {
+            double point = curRecord.acfs[i] + histPoints[i] + futurePoints[i];
+            if(point > maxPoints) {
+                maxPoints = point;
+                selectedIndex = i;
+                selectedCent = curRecord.cents[i];
+            }
+        }
+        float perfectSelectedCent = centToPerfectCent(selectedCent);
+        // Selecting correct octave
+        // STEP 1: If selectedCent is more than one octave away from songKey then change octave
+        // so it is in the same octave as songKey.
+        if(this.songCent >= 0 && perfectSelectedCent != this.songCent) {
+            if (Math.abs(perfectSelectedCent - this.songCent) / 1200 > 1) {
+                selectedCent = octaveToCent(this.songOctave) + selectedCent % 1200;
+            }
+            // STEP 2: Now that the key is withing one octave of songKey see if the is closer to
+            // songOctave or an songKey an octave above or below. the octave that has lowest
+            float octaveAbove = centToPerfectCent(selectedCent) + 1200;
+            float octaveBelow = centToPerfectCent(selectedCent) - 1200;
+            if (Math.abs(octaveAbove - this.songCent)
+                    < Math.abs(selectedCent - this.songCent)) {
+                selectedCent = selectedCent + 1200;
+            } else if (Math.abs(octaveBelow - this.songCent)
+                    < Math.abs(selectedCent - this.songCent)) {
+                selectedCent = selectedCent - 1200;
+            }
+        }
+        // STEP 3: If we have history of strong signal (above average) and current signal is
+        // strong, then the current pitch should be closer.
+        /*
+        perfectSelectedCent = centToPerfectCent(selectedCent);
+        if (pastRecords.size() > 1) {
+            double averageSoundLevel = totalSoundLevel / (nPitches + 1);
+            Record lastRecord = pastRecords.get(pastRecords.size() - 1);
+            float octaveAbove = perfectSelectedCent + 1200;
+            float octaveBelow = perfectSelectedCent - 1200;
+            if (Math.abs(octaveAbove - lastRecord.selectedCent)
+                    < Math.abs(perfectSelectedCent - lastRecord.selectedCent)) {
+                selectedCent = selectedCent + 1200;
+            } else if (Math.abs(octaveBelow - lastRecord.selectedCent)
+                    < Math.abs(perfectSelectedCent - lastRecord.selectedCent)) {
+                selectedCent = selectedCent - 1200;
+            }
+        }*/
+
+        //Store the curRecord in pastRecords
+        curRecord.selectedCent = selectedCent;
+        curRecord.points = maxPoints;
+        pastRecords.add(curRecord);
+        if(pastRecords.size() > historySize) {
+            pastRecords.remove(0); // remove oldest.
+        }
+
+        // Logging
+        String centsStr = LogStr("cents", curRecord.cents);
+        String acfsStr = LogStr("acfs", curRecord.acfs);
+        String histPointStr = LogStr("histPoints", histPoints);
+        String futurePointStr = LogStr("futurePoints", futurePoints);
+        DecimalFormat df = new DecimalFormat("###.##");
+        Log.d("POINTS", nPitches +  ":maxPoints:" + df.format(maxPoints) +
+                ":soundLevel:" + df.format(soundLevel) +
+                ":Note:" + centToNote(selectedCent) +
+                ":perfectCent:" + centToPerfectCent(selectedCent) +
+                ":selectedIndex:" + selectedIndex +
+                centsStr + histPointStr + futurePointStr + acfsStr +
+                ":songCent:" + songCent
+        );
+
+        return centToFreq(selectedCent);
+    }
+
     // Rating system:
     // Each currentCent starts with points from its ACF.
     // For each currentCent compare it with last 5 cents each match give 2 points.
     // If last cent doesn't match then 1 point if it <= 1 octave, 0.5 for 2 octaves.
     // Compare with future cents use matching futureCents ACF as points.
-    private double selectCorrectPitch() {
+    private double selectCorrectPitch(Record curRecord) {
         double minPointLimit = 0.0; // If points are below this we have low confidence
         int historySize = 2;
 
-        Record curRecord = futureRecords.remove(0); // Record we are selecting Pitch for.
         double[] histPoints = new double[curRecord.cents.length];
         double[] futurePoints = new double[curRecord.cents.length];
         for (int i=0; i<curRecord.cents.length; i++) {
@@ -568,14 +719,16 @@ public class FrequencyAnalyzer {
                 float[] futureCents = futureRecords.get(j).cents;
                 double[] futureAcfs = futureRecords.get(j).acfs;
                 for (int k=0; k<futureCents.length; k++) {
-                    if (futureCents[k] > 0 &&
-                            Math.abs(centToPerfectCent(curCent)
-                                    - centToPerfectCent(futureCents[k])) == 0) {
+                    double diff = Math.abs(centToPerfectCent(curCent)
+                            - centToPerfectCent(futureCents[k]));
+                    if (futureCents[k] >= 0 && diff == 0) {
                         futurePoints[i] += 1.0f * nearness * Math.pow(futureAcfs[k], 2);
                     }
                 }
             }
         }
+        /*
+        // STEP 3: OCTAVE point
         float averageHistCent = -1;
         if (nPitches > 5) {
             float histCentsTotal = 0;
@@ -591,7 +744,6 @@ public class FrequencyAnalyzer {
                 averageHistCent = histCentsTotal/counter;
             }
         }
-        // STEP 3: OCTAVE point
         // between harmonics in curRecord give point to the harmonic that is closer to averageHistCent
         if(averageHistCent > 0) {
             for (int i = 0; i < curRecord.cents.length; i++) {
@@ -607,7 +759,7 @@ public class FrequencyAnalyzer {
                     }
                 }
             }
-        }
+        }*/
 
         // Record with highest point will be selected, if 0 points then -1
         double maxPoints = 0;

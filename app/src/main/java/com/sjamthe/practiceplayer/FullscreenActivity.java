@@ -198,15 +198,16 @@ public class FullscreenActivity extends AppCompatActivity {
         YAxis yAxis = lineChart.getAxisRight();
         yAxis.setValueFormatter(new FrequencyFormatter()); //worked
 
-        yAxis.setAxisMaximum(FrequencyAnalyzer.freqToCent(FrequencyAnalyzer.FREQ_C5));
-        yAxis.setAxisMinimum(FrequencyAnalyzer.freqToCent(FrequencyAnalyzer.FREQ_C2));
-        yAxis.setLabelCount(4, true); // Show only C labels
-        yAxis.setGridColor(Color.LTGRAY);
+        yAxis.setAxisMaximum(FrequencyAnalyzer.freqToCent(FrequencyAnalyzer.FREQ_C6));
+        yAxis.setAxisMinimum(FrequencyAnalyzer.freqToCent(FrequencyAnalyzer.FREQ_C1));
+        //yAxis.setLabelCount(4, true); // Show only C labels
+        //yAxis.setGridColor(Color.LTGRAY);
+        yAxis.setDrawLabels(false);
 
         yAxis.setTextColor(Color.WHITE);
         yAxis.setTextSize(14);
-        yAxis.setDrawGridLines(true);
-        yAxis.setGridLineWidth(1.5f);
+        yAxis.setDrawGridLines(false);
+        //yAxis.setGridLineWidth(1.5f);
         drawNotesLines(yAxis);
 
         XAxis xAxis = lineChart.getXAxis();
@@ -219,7 +220,6 @@ public class FullscreenActivity extends AppCompatActivity {
         // lineData.setValueTextColor(Color.WHITE);
         // add empty data
         lineChart.setData(lineData);
-        // limit the number of visible entries
     }
 
     void drawNotesLines(YAxis yAxis) {
@@ -230,20 +230,22 @@ public class FullscreenActivity extends AppCompatActivity {
         do {
             for (int gap: thaat) {
                 cent += gap;
-                if(cent%1200 == 0) {
-                    continue; // Skip C
-                }
                 int octave = FrequencyAnalyzer.centToOctave(cent);
                 int note = FrequencyAnalyzer.centToNote(cent);
                 String noteString = FrequencyAnalyzer.NOTES[note];
                 String label = noteString + Integer.toString(octave);
                 LimitLine ll = new LimitLine(cent, label); // set where the line should be drawn
-                ll.setLineColor(Color.LTGRAY);
-                ll.setLineWidth(1f);
+                ll.setLineColor(Color.GRAY);
                 ll.setTextSize(12);
                 ll.setLabelPosition(LimitLine.LimitLabelPosition.RIGHT_BOTTOM);
                 ll.setTextColor(Color.WHITE);
-                ll.enableDashedLine(10f, 10f, 0f);
+                if(note == 0) { // C note - but can be key if preset
+                    ll.setLineWidth(1.5f);
+                    ll.disableDashedLine();
+                } else {
+                    ll.setLineWidth(1f);
+                    ll.enableDashedLine(10f, 10f, 0f);
+                }
                 yAxis.addLimitLine(ll);
             }
         } while (cent < max);
@@ -278,21 +280,23 @@ public class FullscreenActivity extends AppCompatActivity {
         if (set == null) {
             set = createFrequencySet();
             lineData.addDataSet(set);
+            lineChart.zoom(1f, 2f, 0, 0, YAxis.AxisDependency.RIGHT);
         }
         set.addEntry(new Entry(set.getEntryCount(), cent));
+
+        // move to the latest entry
+        //lineChart.moveViewToX(lineData.getEntryCount()); // no lines if disabled
+        lineChart.moveViewTo(lineData.getEntryCount(),
+                FrequencyAnalyzer.freqToCent(FrequencyAnalyzer.FREQ_C3),
+                YAxis.AxisDependency.RIGHT);
 
         // it may not ber necessary to refresh at every point
         lineData.notifyDataChanged();
         // let the chart know it's data has changed
         lineChart.notifyDataSetChanged();
         // limit the number of visible entries
-        lineChart.setVisibleXRangeMaximum(120);
-        // below doesn't seem to work.
-        // lineChart.centerViewToY(songCent, YAxis.AxisDependency.RIGHT);
+        lineChart.setVisibleXRangeMaximum(120); // has to be here not in createChart
 
-        // move to the latest entry
-        //lineChart.moveViewToX(lineData.getEntryCount()); // no lines if disabled
-        lineChart.moveViewTo(lineData.getEntryCount(), cent, YAxis.AxisDependency.RIGHT);
         lastCents.setVisibility(View.VISIBLE);
 
         if(cent > 0 && songCent >= 0) {

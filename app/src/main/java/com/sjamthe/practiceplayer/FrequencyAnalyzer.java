@@ -374,7 +374,6 @@ public class FrequencyAnalyzer {
         int j;
         for (j=0; j<res.length;j++) {
             inputBuffer[inputPos++] = res[j];
-            inputBuffer[inputPos++] = res[j];
             // playData[totalFrames%playData.length] = res[j];
             totalFrames++;
             if (inputPos == inputBuffer.length) {

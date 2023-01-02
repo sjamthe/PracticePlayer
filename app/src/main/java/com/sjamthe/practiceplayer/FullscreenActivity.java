@@ -59,6 +59,7 @@ public class FullscreenActivity extends AppCompatActivity {
     private MaterialButton markerButton;
     private MaterialButton replayButton;
     private Player player;
+    private Recorder recorder;
     private long seekToInUs = 0;
     int durationInSecs;
     long markerStartInUs = 0;
@@ -398,6 +399,10 @@ public class FullscreenActivity extends AppCompatActivity {
         // lineChart.setOnChartValueSelectedListener(this); // can be used to set listener
         // to listen to events of data selection on chart
         player = new Player(instance);
+        recorder = new Recorder(instance, getApplicationContext());
+        if(!recorder.checkPermissions()) {
+            recorder.requestPermissions();
+        }
 
         markerStartPosition = findViewById(R.id.start_position);
         markerStartPosition.setVisibility(View.GONE);
@@ -583,8 +588,12 @@ public class FullscreenActivity extends AppCompatActivity {
     private void toggleMic() {
         if(micButton.isToggleCheckedStateOnClick()) {
             if(micButton.isChecked()) {
+                fullscreenContent.setVisibility(View.GONE);
+                recorder.startRecording();
                 micButton.setIconResource(R.drawable.ic_baseline_mic_off_24);
             } else {
+                fullscreenContent.setVisibility(View.VISIBLE);
+                recorder.stopRecording();
                 micButton.setIconResource(R.drawable.ic_baseline_mic_on_24);
             }
         }

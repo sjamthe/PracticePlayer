@@ -46,7 +46,7 @@ public class FrequencyAnalyzer {
     // private final PitchDetector detector;
     FullscreenActivity fullscreenActivity;
 
-    static final double VOLUME_THRESHOLD = 1200;
+    static final double VOLUME_THRESHOLD = 0;
 
     public static  String[] NOTES =
             new String[] {"C", "Db", "D", "Eb", "E", "F", "F#", "G", "Ab", "A", "Bb", "B"};
@@ -373,6 +373,7 @@ public class FrequencyAnalyzer {
 
         int j;
         for (j=0; j<res.length;j++) {
+            inputBuffer[inputPos++] = res[j];
             inputBuffer[inputPos++] = res[j];
             // playData[totalFrames%playData.length] = res[j];
             totalFrames++;

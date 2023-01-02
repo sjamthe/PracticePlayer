@@ -46,7 +46,7 @@ public class FrequencyAnalyzer {
     // private final PitchDetector detector;
     FullscreenActivity fullscreenActivity;
 
-    static final double VOLUME_THRESHOLD = 1200.0;
+    static final double VOLUME_THRESHOLD = 1200;
 
     public static  String[] NOTES =
             new String[] {"C", "Db", "D", "Eb", "E", "F", "F#", "G", "Ab", "A", "Bb", "B"};
@@ -92,7 +92,7 @@ public class FrequencyAnalyzer {
     double soundLevel = 0; // Signal power
     double totalSoundLevel = 0;
     float lastCent;
-    int songOctave; // Either set by user or octave of the song key
+    int songOctave = 4; // Either set by user or octave of the song key
     float songCent = -1;
     // public String[] songKey = new String[] {"","",""};
 
@@ -249,8 +249,16 @@ public class FrequencyAnalyzer {
                     octave = i + 1; // C1 is 0 for us.
                 }
             }
-            this.songOctave = octave;
-            this.songCent = octaveToCent(this.songOctave) + songKey*100;
+            /* songOctave is set for now.
+            int octave = 3;
+            if(this.songOctave > 0) {
+                if(songKey < 3) {
+                    octave = this.songOctave - 1;
+                } else {
+                    octave = this.songOctave;
+                }
+            }*/
+            this.songCent = octaveToCent(octave) + songKey*100;
         }
     }
 
@@ -608,9 +616,9 @@ public class FrequencyAnalyzer {
         // Selecting correct octave
         // STEP 1: If selectedCent is more than one octave away from songKey then change octave
         // so it is in the same octave as songKey.
-        if(this.songCent >= 0 && perfectSelectedCent != this.songCent) {
-            if (Math.abs(perfectSelectedCent - this.songCent) / 1200 > 1) {
-                selectedCent = octaveToCent(this.songOctave) + selectedCent % 1200;
+      /*  if(this.songCent >= 0 && perfectSelectedCent != this.songCent) {
+            if (Math.abs(centToOctave(selectedCent) - centToOctave(this.songCent)) > 1) {
+                selectedCent =  centToOctave(this.songCent)*1200 + selectedCent % 1200;
             }
             // STEP 2: Now that the key is withing one octave of songKey see if the is closer to
             // songOctave or an songKey an octave above or below. the octave that has lowest
@@ -623,7 +631,7 @@ public class FrequencyAnalyzer {
                     < Math.abs(selectedCent - this.songCent)) {
                 selectedCent = selectedCent - 1200;
             }
-        }
+        }*/
         // STEP 3: If we have history of strong signal (above average) and current signal is
         // strong, then the current pitch should be closer.
         /*

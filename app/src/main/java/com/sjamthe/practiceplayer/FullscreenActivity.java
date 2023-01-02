@@ -27,6 +27,7 @@ import androidx.appcompat.app.AppCompatActivity;
 
 import com.github.mikephil.charting.charts.LineChart;
 import com.github.mikephil.charting.components.Legend;
+import com.github.mikephil.charting.components.LimitLine;
 import com.github.mikephil.charting.components.XAxis;
 import com.github.mikephil.charting.components.YAxis;
 import com.github.mikephil.charting.data.Entry;
@@ -182,17 +183,31 @@ public class FullscreenActivity extends AppCompatActivity {
         lineChart.getDescription().setEnabled(false); // disable description
         // enable scaling and dragging
         lineChart.setDragEnabled(true);
+        lineChart.setDragYEnabled(true); // don't seem to work.
         lineChart.setScaleEnabled(true);
         lineChart.setPinchZoom(true); // force pinch zoom along both axis
         lineChart.setDrawGridBackground(false);
-        // set an alternative background color
-        // lineChart.setBackgroundColor(Color.LTGRAY);
+        // setting this made lastCent label disappear?
+        // lineChart.setBackgroundColor(getResources().getColor(R.color.light_blue_600));
 
-        lineChart.getAxisRight().setEnabled(false); // disable right axis, we only need left
-        YAxis yAxis = lineChart.getAxisLeft();
-        // yAxis.setAxisMaximum(FrequencyAnalyzer.FreqToCent(FrequencyAnalyzer.FREQ_C4));
+        lineChart.getAxisRight().setEnabled(true); // disable right axis, we only need left
+        lineChart.getAxisLeft().setEnabled(false);
+        lineChart.setVisibleYRange((float) FrequencyAnalyzer.FREQ_MIN,
+                (float) FrequencyAnalyzer.FREQ_MAX, YAxis.AxisDependency.RIGHT);
+        YAxis yAxis = lineChart.getAxisRight();
+        yAxis.setValueFormatter(new FrequencyFormatter()); //worked
+
         yAxis.setAxisMaximum(FrequencyAnalyzer.freqToCent(FrequencyAnalyzer.FREQ_C5));
         yAxis.setAxisMinimum(FrequencyAnalyzer.freqToCent(FrequencyAnalyzer.FREQ_C2));
+        yAxis.setLabelCount(4, true); // Show only C labels
+        yAxis.setGridColor(Color.LTGRAY);
+
+        yAxis.setTextColor(Color.WHITE);
+        yAxis.setTextSize(14);
+        yAxis.setDrawGridLines(true);
+        yAxis.setGridLineWidth(1.5f);
+        drawNotesLines(yAxis);
+
         XAxis xAxis = lineChart.getXAxis();
         xAxis.setAvoidFirstLastClipping(true);
 
@@ -201,22 +216,50 @@ public class FullscreenActivity extends AppCompatActivity {
 
         LineData lineData = new LineData();
         // lineData.setValueTextColor(Color.WHITE);
-
         // add empty data
         lineChart.setData(lineData);
         // limit the number of visible entries
     }
 
-    private LineDataSet createSet() {
-        LineDataSet set = new LineDataSet(null, "Dynamic Data");
-        set.setAxisDependency(YAxis.AxisDependency.LEFT);
-        set.setColor(R.color.light_blue_600); // unable to make line invisible
+    void drawNotesLines(YAxis yAxis) {
+        float min = yAxis.getAxisMinimum();
+        float max = yAxis.getAxisMaximum();
+        float cent = min;
+        int[] thaat = new int[]{200, 200, 200, 100, 200, 200, 100}; // Kalyan
+        do {
+            for (int gap: thaat) {
+                cent += gap;
+                if(cent%1200 == 0) {
+                    continue; // Skip C
+                }
+                int octave = FrequencyAnalyzer.centToOctave(cent);
+                int note = FrequencyAnalyzer.centToNote(cent);
+                String noteString = FrequencyAnalyzer.NOTES[note];
+                String label = noteString + Integer.toString(octave);
+                LimitLine ll = new LimitLine(cent, label); // set where the line should be drawn
+                ll.setLineColor(Color.LTGRAY);
+                ll.setLineWidth(1f);
+                ll.setTextSize(12);
+                ll.setLabelPosition(LimitLine.LimitLabelPosition.RIGHT_BOTTOM);
+                ll.setTextColor(Color.WHITE);
+                ll.enableDashedLine(10f, 10f, 0f);
+                yAxis.addLimitLine(ll);
+            }
+        } while (cent < max);
+
+    }
+
+    private LineDataSet createFrequencySet() {
+        LineDataSet set = new LineDataSet(null, "Frequency Data");
+        set.setAxisDependency(YAxis.AxisDependency.RIGHT);
+        //Set set.setColor to same as lineChart.setBackgroundColor to hide jump lines.
+        set.setColor(getResources().getColor(R.color.light_blue_600));
         // set.setFillColor(R.color.light_blue_A200);
         set.setCircleColor(Color.WHITE);
         set.setLineWidth(.2f); // .2f is almost invisible
         set.setCircleRadius(1.3f);
         set.setFillAlpha(65); // doesn't make any change ?
-        set.setHighLightColor(Color.rgb(244, 117, 117));
+        // set.setHighLightColor(Color.rgb(244, 117, 117)); // not sure what this is for
         set.setValueTextColor(Color.WHITE);
         // set.setValueTextSize(9f);
         set.setDrawValues(false);
@@ -232,7 +275,7 @@ public class FullscreenActivity extends AppCompatActivity {
         }
         ILineDataSet set = lineData.getDataSetByIndex(0);
         if (set == null) {
-            set = createSet();
+            set = createFrequencySet();
             lineData.addDataSet(set);
         }
         set.addEntry(new Entry(set.getEntryCount(), cent));
@@ -243,9 +286,12 @@ public class FullscreenActivity extends AppCompatActivity {
         lineChart.notifyDataSetChanged();
         // limit the number of visible entries
         lineChart.setVisibleXRangeMaximum(120);
+        // below doesn't seem to work.
+        // lineChart.centerViewToY(songCent, YAxis.AxisDependency.RIGHT);
 
         // move to the latest entry
-        lineChart.moveViewToX(lineData.getEntryCount()); // no lines if disabled
+        //lineChart.moveViewToX(lineData.getEntryCount()); // no lines if disabled
+        lineChart.moveViewTo(lineData.getEntryCount(), cent, YAxis.AxisDependency.RIGHT);
         lastCents.setVisibility(View.VISIBLE);
 
         if(cent > 0 && songCent >= 0) {

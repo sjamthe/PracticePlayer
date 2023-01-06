@@ -3,6 +3,7 @@ package com.sjamthe.practiceplayer;
 import static java.lang.Integer.parseInt;
 
 import android.annotation.SuppressLint;
+import android.content.Intent;
 import android.database.Cursor;
 import android.graphics.Color;
 import android.media.AudioTrack;
@@ -13,17 +14,23 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.provider.OpenableColumns;
+import android.view.Menu;
+import android.view.MenuInflater;
+import android.view.MenuItem;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.WindowInsets;
 import android.widget.SeekBar;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.activity.result.ActivityResultCallback;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
+import androidx.annotation.NonNull;
 import androidx.appcompat.app.ActionBar;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.preference.PreferenceFragmentCompat;
 
 import com.github.mikephil.charting.charts.LineChart;
 import com.github.mikephil.charting.components.Legend;
@@ -36,6 +43,8 @@ import com.github.mikephil.charting.data.LineDataSet;
 import com.github.mikephil.charting.interfaces.datasets.ILineDataSet;
 import com.google.android.material.button.MaterialButton;
 import com.sjamthe.practiceplayer.databinding.ActivityFullscreenBinding;
+
+import java.io.IOException;
 
 /**
  * An example full-screen activity that shows and hides the system UI (i.e.
@@ -111,7 +120,11 @@ public class FullscreenActivity extends AppCompatActivity {
                                 MediaMetadataRetriever.METADATA_KEY_DURATION);
                         String title = retriever.extractMetadata(
                                 MediaMetadataRetriever.METADATA_KEY_TITLE);
-                        retriever.release();
+                        try {
+                            retriever.release();
+                        } catch (IOException e) {
+                            e.printStackTrace();
+                        }
 
                         songSeekBar.setMax(parseInt(keyDuration));
                         songSeekBar.setProgress(0);
@@ -280,14 +293,14 @@ public class FullscreenActivity extends AppCompatActivity {
         if (set == null) {
             set = createFrequencySet();
             lineData.addDataSet(set);
-            lineChart.zoom(1f, 2f, 0, 0, YAxis.AxisDependency.RIGHT);
+            lineChart.zoom(1f, 1.5f, 0, 0, YAxis.AxisDependency.RIGHT);
         }
         set.addEntry(new Entry(set.getEntryCount(), cent));
 
         // move to the latest entry
         //lineChart.moveViewToX(lineData.getEntryCount()); // no lines if disabled
         lineChart.moveViewTo(lineData.getEntryCount(),
-                FrequencyAnalyzer.freqToCent(FrequencyAnalyzer.FREQ_C3),
+                songCent,
                 YAxis.AxisDependency.RIGHT);
 
         // it may not ber necessary to refresh at every point
@@ -384,6 +397,26 @@ public class FullscreenActivity extends AppCompatActivity {
 
     public static FullscreenActivity getInstance() {
         return instance;
+    }
+
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+        MenuInflater inflater = getMenuInflater();
+        inflater.inflate(R.menu.main_options_menu, menu);
+        return true;
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(@NonNull MenuItem item) {
+        switch (item.getItemId()) {
+            case R.id.scale:
+                //Toast.makeText(this, "scale ha ha", Toast.LENGTH_SHORT).show();
+                Intent i = new Intent(this, NoteSettingsActivity.class);
+                startActivity(i);
+                return true;
+            default:
+                return super.onOptionsItemSelected(item);
+        }
     }
 
     @Override
@@ -681,5 +714,12 @@ public class FullscreenActivity extends AppCompatActivity {
     private void delayedHide(int delayMillis) {
         mHideHandler.removeCallbacks(mHideRunnable);
         mHideHandler.postDelayed(mHideRunnable, delayMillis);
+    }
+
+    public static class SettingsFragment extends PreferenceFragmentCompat {
+        @Override
+        public void onCreatePreferences(Bundle savedInstanceState, String rootKey) {
+            setPreferencesFromResource(R.xml.note_preferences, rootKey);
+        }
     }
 }

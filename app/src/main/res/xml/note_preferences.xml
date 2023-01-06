@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+    <PreferenceCategory android:title="Notes Settings">
+    <ListPreference
+        android:defaultValue="0"
+        android:entries="@array/note_entries"
+        android:entryValues="@array/note_values"
+        android:key="root_note"
+        android:title="Root Note"
+        app:useSimpleSummaryProvider="true"/>
+    </PreferenceCategory>
+</PreferenceScreen>

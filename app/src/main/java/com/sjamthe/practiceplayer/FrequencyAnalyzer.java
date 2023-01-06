@@ -46,7 +46,7 @@ public class FrequencyAnalyzer {
     // private final PitchDetector detector;
     FullscreenActivity fullscreenActivity;
 
-    static final double VOLUME_THRESHOLD = 0;
+    static final double VOLUME_THRESHOLD = 500;
 
     public static  String[] NOTES =
             new String[] {"C", "Db", "D", "Eb", "E", "F", "F#", "G", "Ab", "A", "Bb", "B"};
@@ -238,7 +238,7 @@ public class FrequencyAnalyzer {
                 scale = "minor";
             }
         }
-        if(songKey >= 0) {
+        if(songKey >= 0) {/*
             // Find the octave that has max freq for this key
             int maxOctave = this.octaveNotesDistribution.length;
             int max = Integer.MIN_VALUE;
@@ -248,10 +248,10 @@ public class FrequencyAnalyzer {
                     max = this.octaveNotesDistribution[i][songKey];
                     octave = i + 1; // C1 is 0 for us.
                 }
-            }
-            /* songOctave is set for now.
+            }*/
+            // songOctave is set for now.
             int octave = 3;
-            if(this.songOctave > 0) {
+           /* if(this.songOctave > 0) {
                 if(songKey < 3) {
                     octave = this.songOctave - 1;
                 } else {
@@ -616,7 +616,7 @@ public class FrequencyAnalyzer {
         // Selecting correct octave
         // STEP 1: If selectedCent is more than one octave away from songKey then change octave
         // so it is in the same octave as songKey.
-      /*  if(this.songCent >= 0 && perfectSelectedCent != this.songCent) {
+        if(this.songCent >= 0 && perfectSelectedCent != this.songCent) {
             if (Math.abs(centToOctave(selectedCent) - centToOctave(this.songCent)) > 1) {
                 selectedCent =  centToOctave(this.songCent)*1200 + selectedCent % 1200;
             }
@@ -631,10 +631,10 @@ public class FrequencyAnalyzer {
                     < Math.abs(selectedCent - this.songCent)) {
                 selectedCent = selectedCent - 1200;
             }
-        }*/
+        }
         // STEP 3: If we have history of strong signal (above average) and current signal is
         // strong, then the current pitch should be closer.
-        /*
+
         perfectSelectedCent = centToPerfectCent(selectedCent);
         if (pastRecords.size() > 1) {
             double averageSoundLevel = totalSoundLevel / (nPitches + 1);
@@ -648,7 +648,7 @@ public class FrequencyAnalyzer {
                     < Math.abs(perfectSelectedCent - lastRecord.selectedCent)) {
                 selectedCent = selectedCent - 1200;
             }
-        }*/
+        }
 
         //Store the curRecord in pastRecords
         curRecord.selectedCent = selectedCent;

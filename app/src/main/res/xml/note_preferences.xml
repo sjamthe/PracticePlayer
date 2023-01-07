@@ -2,12 +2,29 @@
 <PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
     <PreferenceCategory android:title="Notes Settings">
-    <ListPreference
-        android:defaultValue="0"
-        android:entries="@array/note_entries"
-        android:entryValues="@array/note_values"
-        android:key="root_note"
-        android:title="Root Note"
-        app:useSimpleSummaryProvider="true"/>
+        <ListPreference
+            android:defaultValue="0"
+            android:entries="@array/note_entries"
+            android:entryValues="@array/note_values"
+            android:key="root_note"
+            android:title="Sa/Root Note/Key"
+            app:useSimpleSummaryProvider="true"/>
+
+        <ListPreference
+            android:defaultValue="3"
+            android:entries="@array/octave_entries"
+            android:entryValues="@array/octave_entries"
+            android:key="root_octave"
+            android:title="Root Octave/Madhya Saptak"
+            app:useSimpleSummaryProvider="true"/>
+
+        <ListPreference
+            android:defaultValue="bilawal"
+            android:entries="@array/thaat_entries"
+            android:entryValues="@array/thaat_values"
+            android:key="thaat"
+            android:title="Thaat / Scale"
+            app:useSimpleSummaryProvider="true"/>
+
     </PreferenceCategory>
 </PreferenceScreen>

@@ -8,6 +8,7 @@ import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.OptionalDouble;
 
 /*
@@ -48,8 +49,10 @@ public class FrequencyAnalyzer {
 
     static final double VOLUME_THRESHOLD = 500;
 
-    public static  String[] NOTES =
+    public static  final String[] NOTES =
             new String[] {"C", "Db", "D", "Eb", "E", "F", "F#", "G", "Ab", "A", "Bb", "B"};
+    public static final String[] SWARAS  =
+            new String[] {"S", "r", "R", "g", "G", "m", "M", "P", "d", "D", "n", "N"};
     public static final double FREQ_A1 = 55.0d;
     static final int ANALYZE_SAMPLES_PER_SECOND = 15; // can be a variable
     public static final double SEMITONE_INTERVAL = Math.pow(2.0d, 1.0d/12.0d); // 1.05946
@@ -158,6 +161,35 @@ public class FrequencyAnalyzer {
             return -1.0f;
         }
         return (double)  FREQ_C1*Math.pow(2, cent/1200.0d) ;
+    }
+
+    //Thaat map
+    /*  <item>Bilawal / Major [S R G m P D N S]</item>
+        <item>Khamaj / Mixolydian [S R G m P D n S]</item>
+        <item>Kaafi / Dorian [S R g m P D n S]</item>
+        <item>Asawari / Natural minor [S R g m P d n S]</item>
+        <item>Bhairavi / Phrygian [S r g m P d n S]</item>
+        <item>Bhairav / Double Harmonic [S r G m P d N S]</item>
+        <item>Kalyan / Lydian [S R G M\' P D N S]</item>
+        <item>Marwa / - [S r G M\' P D N S]</item>
+        <item>Poorvi / - [S r G M\' P d N S]</item>
+        <item>Todi / - [S r g M\' P d N S]</item>
+        */
+    public static HashMap<String, int[]> getThaatMap() {
+        HashMap<String, int[]> map = new HashMap<String, int[]>();
+
+        map.put("bilawal", new int[]{200, 200, 100, 200, 200, 200, 100});
+        map.put("khamaj", new int[]{200, 200, 100, 200, 200, 100, 200});
+        map.put("kaafi", new int[]{200, 100, 200, 200, 200, 100, 200});
+        map.put("asavari", new int[]{200, 100, 200, 200, 100, 200, 200});
+        map.put("bhairavi", new int[]{100, 200, 200, 200, 100, 200, 200});
+        map.put("bhairav", new int[]{100, 300, 100, 200, 100, 300, 100});
+        map.put("kalyan", new int[]{200, 200, 200, 100, 200, 200, 100});
+        map.put("marwa", new int[]{100, 300, 200, 100, 200, 200, 100});
+        map.put("poorvi", new int[]{100, 300, 200, 100, 100, 300, 100});
+        map.put("todi", new int[]{100, 200, 300, 100, 100, 300, 100});
+
+        return map;
     }
 
     // Round up cent to perfect note in every octave

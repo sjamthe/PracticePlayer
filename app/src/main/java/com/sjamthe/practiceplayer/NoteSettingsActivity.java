@@ -1,9 +1,11 @@
 package com.sjamthe.practiceplayer;
 
 import android.os.Bundle;
+import android.util.Log;
 
 import androidx.appcompat.app.ActionBar;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.preference.Preference;
 import androidx.preference.PreferenceFragmentCompat;
 
 public class NoteSettingsActivity extends AppCompatActivity {
@@ -28,6 +30,23 @@ public class NoteSettingsActivity extends AppCompatActivity {
         @Override
         public void onCreatePreferences(Bundle savedInstanceState, String rootKey) {
             setPreferencesFromResource(R.xml.note_preferences, rootKey);
+/*
+            Preference rootNote = findPreference("root_note");
+            rootNote.setOnPreferenceChangeListener((preference, newVal) -> {
+                String value = (String) newVal;
+                return true;
+            });*/
         }
+
+        /*
+        @Override
+        public boolean onPreferenceTreeClick(Preference preference ) {
+            switch (preference.getKey()) {
+                default:
+                    return super.onPreferenceTreeClick(preference);
+            }
+            //return true;
+        }*/
     }
+
 }

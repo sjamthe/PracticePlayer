@@ -28,7 +28,7 @@
         <item>10</item>
         <item>11</item>
     </string-array>
-    <string-array name="scale_entries">
+    <string-array name="octave_entries">
         <item>0</item>
         <item>1</item>
         <item>2</item>
@@ -38,5 +38,29 @@
         <item>6</item>
         <item>7</item>
         <item>8</item>
+    </string-array>
+    <string-array name="thaat_entries" >
+        <item>Bilawal / Major [S R G m P D N S]</item>
+        <item>Khamaj / Mixolydian [S R G m P D n S]</item>
+        <item>Kaafi / Dorian [S R g m P D n S]</item>
+        <item>Asawari / Natural minor [S R g m P d n S]</item>
+        <item>Bhairavi / Phrygian [S r g m P d n S]</item>
+        <item>Bhairav / Double Harmonic [S r G m P d N S]</item>
+        <item>Kalyan / Lydian [S R G M\' P D N S]</item>
+        <item>Marwa / - [S r G M\' P D N S]</item>
+        <item>Poorvi / - [S r G M\' P d N S]</item>
+        <item>Todi / - [S r g M\' P d N S]</item>
+    </string-array>
+    <string-array name="thaat_values" >
+        <item>bilawal</item>
+        <item>khamaj</item>
+        <item>kaafi</item>
+        <item>asavari</item>
+        <item>bhairavi</item>
+        <item>bhairav</item>
+        <item>kalyan</item>
+        <item>marwa</item>
+        <item>poorvi</item>
+        <item>todi</item>
     </string-array>
 </resources>

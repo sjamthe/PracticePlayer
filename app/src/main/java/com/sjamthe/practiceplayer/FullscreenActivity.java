@@ -4,6 +4,7 @@ import static java.lang.Integer.parseInt;
 
 import android.annotation.SuppressLint;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.database.Cursor;
 import android.graphics.Color;
 import android.media.AudioTrack;
@@ -22,7 +23,6 @@ import android.view.View;
 import android.view.WindowInsets;
 import android.widget.SeekBar;
 import android.widget.TextView;
-import android.widget.Toast;
 
 import androidx.activity.result.ActivityResultCallback;
 import androidx.activity.result.ActivityResultLauncher;
@@ -31,6 +31,7 @@ import androidx.annotation.NonNull;
 import androidx.appcompat.app.ActionBar;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.preference.PreferenceFragmentCompat;
+import androidx.preference.PreferenceManager;
 
 import com.github.mikephil.charting.charts.LineChart;
 import com.github.mikephil.charting.components.Legend;
@@ -45,6 +46,7 @@ import com.google.android.material.button.MaterialButton;
 import com.sjamthe.practiceplayer.databinding.ActivityFullscreenBinding;
 
 import java.io.IOException;
+import java.util.HashMap;
 
 /**
  * An example full-screen activity that shows and hides the system UI (i.e.
@@ -76,6 +78,12 @@ public class FullscreenActivity extends AppCompatActivity {
 
     boolean replayState;
     boolean markerButtonAtStart; // Tracks if marker button is set to start or end
+
+    // Values stored in preference
+    String rootNote = "";
+    String rootOctave = "";
+    String thaat = "";
+    private boolean settingsChanged = false;
 
     /**
      * Whether or not the system UI should be auto-hidden after
@@ -192,6 +200,24 @@ public class FullscreenActivity extends AppCompatActivity {
         songSeekBarPosition.setText(secsToTime(positionInSecs) + "/" + secsToTime(durationInSecs));
     }
 
+    // Reads Note settings from preferences, returns true if settings have changed
+    boolean readSettings() {
+        boolean change = false;
+        final SharedPreferences mSharedPreference=
+                PreferenceManager.getDefaultSharedPreferences(getBaseContext());
+        String newRootNote =(mSharedPreference.getString("root_note", "-1"));
+        String newRootOctave =(mSharedPreference.getString("root_octave", "-1"));
+        String newThaat =(mSharedPreference.getString("thaat", "-1"));
+        if(!newThaat.equals(thaat) || !newRootOctave.equals(rootOctave)
+                || !newRootNote.equals(rootNote)) {
+            change = true;
+            rootNote = newRootNote;
+            rootOctave = newRootOctave;
+            thaat = newThaat;
+        }
+        return change;
+    }
+
     void createChart() {
         lineChart.setTouchEnabled(true);
         lineChart.getDescription().setEnabled(false); // disable description
@@ -204,24 +230,9 @@ public class FullscreenActivity extends AppCompatActivity {
         // setting this made lastCent label disappear?
         // lineChart.setBackgroundColor(getResources().getColor(R.color.light_blue_600));
 
-        lineChart.getAxisRight().setEnabled(true); // disable right axis, we only need left
         lineChart.getAxisLeft().setEnabled(false);
-        lineChart.setVisibleYRange((float) FrequencyAnalyzer.FREQ_MIN,
-                (float) FrequencyAnalyzer.FREQ_MAX, YAxis.AxisDependency.RIGHT);
-        YAxis yAxis = lineChart.getAxisRight();
-        yAxis.setValueFormatter(new FrequencyFormatter()); //worked
 
-        yAxis.setAxisMaximum(FrequencyAnalyzer.freqToCent(FrequencyAnalyzer.FREQ_C6));
-        yAxis.setAxisMinimum(FrequencyAnalyzer.freqToCent(FrequencyAnalyzer.FREQ_C1));
-        //yAxis.setLabelCount(4, true); // Show only C labels
-        //yAxis.setGridColor(Color.LTGRAY);
-        yAxis.setDrawLabels(false);
-
-        yAxis.setTextColor(Color.WHITE);
-        yAxis.setTextSize(14);
-        yAxis.setDrawGridLines(false);
-        //yAxis.setGridLineWidth(1.5f);
-        drawNotesLines(yAxis);
+        setNotesAxis();
 
         XAxis xAxis = lineChart.getXAxis();
         xAxis.setAvoidFirstLastClipping(true);
@@ -235,24 +246,53 @@ public class FullscreenActivity extends AppCompatActivity {
         lineChart.setData(lineData);
     }
 
+    void setNotesAxis() {
+        lineChart.getAxisRight().setEnabled(true); // disable right axis, we only need left
+        YAxis yAxis = lineChart.getAxisRight();
+        //yAxis.setAxisMinimum(FrequencyAnalyzer.freqToCent(FrequencyAnalyzer.FREQ_MIN));
+        //yAxis.setAxisMaximum(FrequencyAnalyzer.freqToCent(FrequencyAnalyzer.FREQ_MAX));
+        yAxis.setValueFormatter(new FrequencyFormatter(rootNote, rootOctave)); //Used to write Note characters
+
+        yAxis.setLabelCount(4, true); // Show only C labels
+        yAxis.setDrawLabels(true);
+        //yAxis.setGridColor(Color.LTGRAY);
+
+        yAxis.setTextColor(Color.WHITE);
+        yAxis.setTextSize(14);
+        yAxis.setDrawGridLines(false);
+        //yAxis.setGridLineWidth(1.5f);
+        drawNotesLines(yAxis);
+        lineChart.notifyDataSetChanged();
+    }
+
     void drawNotesLines(YAxis yAxis) {
-        float min = yAxis.getAxisMinimum();
-        float max = yAxis.getAxisMaximum();
+        if(this.rootOctave == "" || this.rootNote == "") {
+            this.settingsChanged = readSettings();
+        }
+        HashMap<String, int[]> thaatMap = FrequencyAnalyzer.getThaatMap();
+        yAxis.removeAllLimitLines(); // reset as settings may have changed.
+        float rootCent = FrequencyAnalyzer.octaveToCent(Integer.parseInt(this.rootOctave))
+                + Integer.parseInt(this.rootNote)*100;
+        float min = rootCent - 1200;
+        float max = rootCent + 2*1200;
+        yAxis.setAxisMinimum(min);
+        yAxis.setAxisMaximum(max);
+        int[] thaatNotes = thaatMap.get(this.thaat);
+
         float cent = min;
-        int[] thaat = new int[]{200, 200, 200, 100, 200, 200, 100}; // Kalyan
         do {
-            for (int gap: thaat) {
-                cent += gap;
+            for (int gap: thaatNotes) {
                 int octave = FrequencyAnalyzer.centToOctave(cent);
                 int note = FrequencyAnalyzer.centToNote(cent);
-                String noteString = FrequencyAnalyzer.NOTES[note];
-                String label = noteString + Integer.toString(octave);
+                int swar = (note - Integer.parseInt(this.rootNote) + 12)%12;
+                String noteString = FrequencyAnalyzer.SWARAS[swar]; //FrequencyAnalyzer.NOTES[note];
+                String label = noteString; // + Integer.toString(octave);
                 LimitLine ll = new LimitLine(cent, label); // set where the line should be drawn
                 ll.setLineColor(Color.GRAY);
                 ll.setTextSize(12);
                 ll.setLabelPosition(LimitLine.LimitLabelPosition.RIGHT_BOTTOM);
                 ll.setTextColor(Color.WHITE);
-                if(note == 0) { // C note - but can be key if preset
+                if(swar == 0) { // or note == Integer.parseInt(rootNote)
                     ll.setLineWidth(1.5f);
                     ll.disableDashedLine();
                 } else {
@@ -260,9 +300,11 @@ public class FullscreenActivity extends AppCompatActivity {
                     ll.enableDashedLine(10f, 10f, 0f);
                 }
                 yAxis.addLimitLine(ll);
+                cent += gap;
             }
         } while (cent < max);
 
+        //lineChart.setVisibleYRange(min, max, yAxis.getAxisDependency());
     }
 
     private LineDataSet createFrequencySet() {
@@ -284,25 +326,31 @@ public class FullscreenActivity extends AppCompatActivity {
     }
 
     void updateChart(float cent, float songCent) {
+        lineChart.setVisibility(View.VISIBLE);
         LineData lineData = lineChart.getData();
         if(lineData == null) {
             createChart();
             lineData = lineChart.getData();
         }
+        if(settingsChanged) {
+            setNotesAxis();
+            settingsChanged = false;
+        }
+
         ILineDataSet set = lineData.getDataSetByIndex(0);
         if (set == null) {
             set = createFrequencySet();
             lineData.addDataSet(set);
-            lineChart.zoom(1f, 1.5f, 0, 0, YAxis.AxisDependency.RIGHT);
+            //lineChart.zoom(1f, 1.5f, 0, 0, YAxis.AxisDependency.RIGHT);
         }
         set.addEntry(new Entry(set.getEntryCount(), cent));
 
         // move to the latest entry
-        //lineChart.moveViewToX(lineData.getEntryCount()); // no lines if disabled
-        lineChart.moveViewTo(lineData.getEntryCount(),
+        lineChart.moveViewToX(lineData.getEntryCount()); // no lines if disabled
+        /*lineChart.moveViewTo(lineData.getEntryCount(),
                 songCent,
                 YAxis.AxisDependency.RIGHT);
-
+*/
         // it may not ber necessary to refresh at every point
         lineData.notifyDataChanged();
         // let the chart know it's data has changed
@@ -327,6 +375,7 @@ public class FullscreenActivity extends AppCompatActivity {
                     FrequencyAnalyzer.NOTES[FrequencyAnalyzer.centToNote(cent)],
                     FrequencyAnalyzer.centToOctave(cent)));
         }
+        lastCents.setText(this.thaat);
     }
 
     private final Runnable mHidePart2Runnable = new Runnable() {
@@ -419,6 +468,15 @@ public class FullscreenActivity extends AppCompatActivity {
         }
     }
 
+    // Fetch the stored data in onResume()
+    // Because this is what will be called
+    // when the app opens again
+    @Override
+    protected void onResume() {
+        super.onResume();
+        settingsChanged = readSettings();
+    }
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -432,7 +490,8 @@ public class FullscreenActivity extends AppCompatActivity {
         songSeekBarPosition.setVisibility(View.GONE);
 
         lineChart = findViewById(R.id.activity_main_linechart);
-        createChart();
+        lineChart.setVisibility(View.GONE);
+        // createChart();
         // lineChart.setOnChartValueSelectedListener(this); // can be used to set listener
         // to listen to events of data selection on chart
         player = new Player(instance);
@@ -626,10 +685,14 @@ public class FullscreenActivity extends AppCompatActivity {
         if(micButton.isToggleCheckedStateOnClick()) {
             if(micButton.isChecked()) {
                 fullscreenContent.setVisibility(View.GONE);
+                lineChart.setVisibility(View.VISIBLE);
+                lastCents.setVisibility(View.VISIBLE);
                 recorder.startRecording();
                 micButton.setIconResource(R.drawable.ic_baseline_mic_off_24);
             } else {
                 fullscreenContent.setVisibility(View.VISIBLE);
+                lineChart.setVisibility(View.GONE);
+                lastCents.setVisibility(View.GONE);
                 recorder.stopRecording();
                 micButton.setIconResource(R.drawable.ic_baseline_mic_on_24);
             }

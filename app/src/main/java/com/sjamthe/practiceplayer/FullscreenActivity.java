@@ -47,6 +47,7 @@ import com.sjamthe.practiceplayer.databinding.ActivityFullscreenBinding;
 
 import java.io.IOException;
 import java.util.HashMap;
+import java.util.Locale;
 
 /**
  * An example full-screen activity that shows and hides the system UI (i.e.
@@ -55,7 +56,7 @@ import java.util.HashMap;
 public class FullscreenActivity extends AppCompatActivity {
 
     // Initializing all variables..
-    private static FullscreenActivity instance;
+    FullscreenActivity instance;
     public Handler fullScreenHandler;
     private SeekBar songSeekBar;
     private LineChart lineChart;
@@ -66,7 +67,7 @@ public class FullscreenActivity extends AppCompatActivity {
     private TextView lastCents;
     private TextView thaatText;
     private MaterialButton micButton;
-    private MaterialButton fileButton;
+    MaterialButton fileButton;
     private MaterialButton playButton;
     private MaterialButton markerButton;
     private MaterialButton replayButton;
@@ -144,8 +145,7 @@ public class FullscreenActivity extends AppCompatActivity {
                         songSeekBar.setVisibility(View.VISIBLE);
                         songSeekBarPosition.setVisibility(View.VISIBLE);
                         durationInSecs = 0;
-                        if (keyDuration != null)
-                            durationInSecs = Math.round(parseInt(keyDuration) / 1000f);
+                        durationInSecs = Math.round(parseInt(keyDuration) / 1000f);
 
                         if (title == null)
                             title = getFileName(uri);
@@ -421,19 +421,19 @@ public class FullscreenActivity extends AppCompatActivity {
                 - Integer.parseInt(this.rootNote) + 12)%12;
         if(cent > 0 && songCent >= 0) {
             lastCents.setText(FrequencyAnalyzer.SWARAS[swar]);
-            thaatText.setText(String.format("key:%s %s",
+            thaatText.setText(String.format("key:%s %s vol:%d",
                     FrequencyAnalyzer.NOTES[FrequencyAnalyzer.centToNote(songCent)],
-                    this.thaat));
+                    this.thaat, (int) soundLevel));
         } else if (songCent >= 0){
             lastCents.setText("-");
-            thaatText.setText(String.format("key:%s %s",
+            thaatText.setText(String.format("key:%s %s vol:%d",
                     FrequencyAnalyzer.NOTES[FrequencyAnalyzer.centToNote(songCent)],
-                    this.thaat));
+                    this.thaat, (int) soundLevel));
         } else if(cent > 0) {
             lastCents.setText(FrequencyAnalyzer.SWARAS[swar]);
-            thaatText.setText(String.format("%s", this.thaat));
+            thaatText.setText(String.format("%s vol:%d", this.thaat, (int) soundLevel));
         }
-        thaatText.setText(String.format("%d - %d",(int)cent, (int) soundLevel)); // DEBUG
+        //thaatText.setText(String.format("%d - %d",(int)cent, (int) soundLevel)); // DEBUG
     }
 
     private final Runnable mHidePart2Runnable = new Runnable() {
@@ -502,9 +502,9 @@ public class FullscreenActivity extends AppCompatActivity {
     };
     private ActivityFullscreenBinding binding;
 
-    public static FullscreenActivity getInstance() {
+    /*public static FullscreenActivity getInstance() {
         return instance;
-    }
+    }*/
 
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {

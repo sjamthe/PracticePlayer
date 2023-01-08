@@ -48,11 +48,12 @@
         <TextView
             android:id="@+id/swar"
             android:layout_width="match_parent"
-            android:layout_height="48dp"
+            android:layout_marginTop="14sp"
+            android:layout_height="64dp"
             android:gravity="center"
             android:layout_alignParentStart="true"
             android:textColor="@color/design_default_color_on_primary"
-            android:textSize="24dp"
+            android:textSize="48dp"
             android:text="" />
 
         <com.github.mikephil.charting.charts.LineChart

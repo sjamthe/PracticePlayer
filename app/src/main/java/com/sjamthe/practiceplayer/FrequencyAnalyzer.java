@@ -727,9 +727,18 @@ public class FrequencyAnalyzer {
             // how close are we to current note, also remember A, B note are on prev octave.
             diff = Math.abs(note - lastNote);
             // int newNote = lastNote + diff;
-            if(diff <= 7) { // same octave as last
+            if(diff <= 6) { // same octave as last
                  selectedOctave = centToOctave(lastRecord.selectedCent);
-            } else {
+            }/* else if(diff > 6 && diff < 7) { // use octave distribution to resolve tie
+                selectedOctave = centToOctave(lastRecord.selectedCent);
+                if(octaveNotesDistribution[selectedOctave][note] <
+                        octaveNotesDistribution[selectedOctave - 1][note]) {
+                    selectedOctave = selectedOctave -1;
+                } else if(octaveNotesDistribution[selectedOctave][note] <
+                        octaveNotesDistribution[selectedOctave + 1][note]) {
+                    selectedOctave = selectedOctave + 1;
+                }
+            }*/ else {
                 if(note >= 7) { // we are going below C
                     selectedOctave = centToOctave(lastRecord.selectedCent) - 1;
                 } else if (lastNote >= 9) {
@@ -741,7 +750,7 @@ public class FrequencyAnalyzer {
             }
         } else { // If no history use octave based on rootNote
             diff = Math.abs(note - preferences.rootNote);
-            if(diff <= 7) { // same octave as last
+            if(diff <= 6) { // same octave as last
                 selectedOctave = preferences.rootOctave;
             } else {
                 if(note >= 7) {
@@ -755,20 +764,26 @@ public class FrequencyAnalyzer {
             }
         }
         float error = curRecord.selectedCent - centToPerfectCent(curRecord.selectedCent);
+        // limit selected octave to +-1 of rootOctave
+        if(selectedOctave > preferences.rootOctave + 1) {
+            selectedOctave = preferences.rootOctave + 1;
+        } else if(selectedOctave < preferences.rootOctave - 1){
+            selectedOctave = preferences.rootOctave - 1;
+        }
         correctedCent = octaveToCent(selectedOctave) + note*100 + error;
 
         if(lastRecord != null) {
-            Log.d("OCTAVE", String.format("curRecord.selectedCent:%d:note:%d:" +
+            Log.d("OCTAVE", String.format("nPitches:%d:curRecord.selectedCent:%d:note:%d:" +
                             "lastRecord.selectedCent:%d:lastNote:%d:diff:%d:selectedOctave:%d:error:%f:" +
-                            "correctedCent:%d", (int) curRecord.selectedCent, note,
+                            "correctedCent:%d:soundLevel:%d",nPitches, (int) curRecord.selectedCent, note,
                     (int) lastRecord.selectedCent, lastNote, diff, selectedOctave, error,
-                    (int) correctedCent));
+                    (int) correctedCent, (int) soundLevel));
         } else {
-            Log.d("OCTAVE", String.format("curRecord.selectedCent:%d:note:%d:" +
+            Log.d("OCTAVE", String.format("nPitches:%d:curRecord.selectedCent:%d:note:%d:" +
                             "lastRecord.selectedCent:-1:lastNote:%d:diff:%d:selectedOctave:%d:error:%f:" +
-                            "correctedCent:%d", (int) curRecord.selectedCent, note,
+                            "correctedCent:%d:soundLevel:%d",nPitches, (int) curRecord.selectedCent, note,
                     lastNote, diff, selectedOctave, error,
-                    (int) correctedCent));
+                    (int) correctedCent, (int) soundLevel));
         }
 
         curRecord.selectedCent = correctedCent;

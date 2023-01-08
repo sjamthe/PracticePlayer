@@ -5,6 +5,7 @@ import android.util.Log;
 import androidx.annotation.NonNull;
 
 import java.text.DecimalFormat;
+import java.text.Format;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -47,7 +48,7 @@ public class FrequencyAnalyzer {
     // private final PitchDetector detector;
     FullscreenActivity fullscreenActivity;
 
-    static final double VOLUME_THRESHOLD = 500;
+    //static final double VOLUME_THRESHOLD = 500;
 
     public static  final String[] NOTES =
             new String[] {"C", "Db", "D", "Eb", "E", "F", "F#", "G", "Ab", "A", "Bb", "B"};
@@ -85,6 +86,13 @@ public class FrequencyAnalyzer {
     ArrayList<Record> futureRecords = new ArrayList<Record>();
     ArrayList<Record> pastRecords = new ArrayList<Record>();
 
+    public static class UserPreferences {
+        int rootNote;
+        int rootOctave;
+        String thaat;
+    };
+    private UserPreferences preferences;
+
     double [] haanData;
     // short [] playData; // Contains data that has been analyzed and ready to play.
     short [] inputBuffer;
@@ -112,7 +120,7 @@ public class FrequencyAnalyzer {
     int writePos = 0;
     int readPos = 0;
     double samplingSize;
-    double threshold = VOLUME_THRESHOLD;
+    double threshold = 0;
     FFT4g fft;
     int fftSize;
     int analyzeSize;
@@ -206,7 +214,7 @@ public class FrequencyAnalyzer {
     public static int centToOctave(float cent) {
         if(cent < 0)
             return -1;
-        return (int)(cent/1200) + 1; // Each Octave has 1200 cents;
+        return (int)(centToPerfectCent(cent)/1200) + 1; // Each Octave has 1200 cents;
     }
 
     public static float octaveToCent(int octave) {
@@ -242,8 +250,17 @@ public class FrequencyAnalyzer {
         return sum;
     }
 
+    public void setPreferences(String rootNote, String rootOctave, String thaat,
+                               String minSoundLevel) {
+        preferences = new UserPreferences();
+        preferences.rootNote = Integer.parseInt(rootNote);
+        preferences.rootOctave = Integer.parseInt(rootOctave);
+        preferences.thaat = thaat;
+        this.threshold = Integer.parseInt(minSoundLevel);
+    }
+
     // Returns array with [scale, key, octave]
-    public void setSongKey() {
+    public void findSongKey() {
         if(nCents < 100)
             return;
 
@@ -270,28 +287,7 @@ public class FrequencyAnalyzer {
                 scale = "minor";
             }
         }
-        if(songKey >= 0) {/*
-            // Find the octave that has max freq for this key
-            int maxOctave = this.octaveNotesDistribution.length;
-            int max = Integer.MIN_VALUE;
-            int octave = -1;
-            for (int i=0; i<maxOctave; i++) {
-                if(this.octaveNotesDistribution[i][songKey] > max) {
-                    max = this.octaveNotesDistribution[i][songKey];
-                    octave = i + 1; // C1 is 0 for us.
-                }
-            }*/
-            // songOctave is set for now.
-            int octave = 3;
-           /* if(this.songOctave > 0) {
-                if(songKey < 3) {
-                    octave = this.songOctave - 1;
-                } else {
-                    octave = this.songOctave;
-                }
-            }*/
-            this.songCent = octaveToCent(octave) + songKey*100;
-        }
+        this.songCent = octaveToCent(preferences.rootOctave) + songKey*100;
     }
 
     // Function that returns weight constants got from research.
@@ -386,7 +382,8 @@ public class FrequencyAnalyzer {
     private final Runnable runUpdateChart = new Runnable() {
         @Override
         public void run() {
-            fullscreenActivity.updateChart(lastCent, songCent);
+            fullscreenActivity.updateChart(lastCent, songCent, (float) soundLevel,
+                    (float) (totalSoundLevel/(nPitches+1)));
         }
     };
 
@@ -481,14 +478,14 @@ public class FrequencyAnalyzer {
             nCents++;
             notesDistribution[centToNote(lastCent)]++;
             octaveNotesDistribution[centToOctave(lastCent)-1][centToNote(lastCent)]++;
+
+            if(nCents%100 == 0) {
+                // Recalculate songKey every 100 readings
+                findSongKey();
+            }
         }
         centBuffer[nPitches%pitchBuffer.length] = lastCent;
         nPitches++;
-
-        if(nCents%100 == 0) {
-            setSongKey();
-            // Log.i("KEY", "SongKey:" + songKey[0] + ":" + songKey[1] + songKey[2]);
-        }
 
         if(fullscreenActivity != null && fullscreenActivity.fullScreenHandler != null)
             fullscreenActivity.fullScreenHandler.post(runUpdateChart);
@@ -547,7 +544,8 @@ public class FrequencyAnalyzer {
             // Step 2: Select pitch based on last 2 pitches, and future two pitch choices.
             Record analyzeRecord = futureRecords.remove(0); // Record we are selecting Pitch for.
             // selectedFreq = selectCorrectPitch(analyzeRecord);
-            selectedFreq = selectCorrectNote(analyzeRecord);
+            selectCorrectNote(analyzeRecord);
+            selectedFreq = selectCorrectOctave(analyzeRecord);
             // Step 3: Fine tune step2 freq using ACF
             finalFreq = fineTuneStep3(selectedFreq);
         };
@@ -573,9 +571,8 @@ public class FrequencyAnalyzer {
     }
 
     // Use points system to select correct Note (ignore octave)
-    private double selectCorrectNote(Record curRecord) {
+    private void selectCorrectNote(Record curRecord) {
         double minPointLimit = 0.0; // If points are below this we have low confidence
-        int historySize = 2;
 
         double[] histPoints = new double[curRecord.cents.length];
         double[] futurePoints = new double[curRecord.cents.length];
@@ -644,6 +641,12 @@ public class FrequencyAnalyzer {
                 selectedCent = curRecord.cents[i];
             }
         }
+
+        //Store the curRecord in pastRecords
+        curRecord.selectedCent = selectedCent;
+        curRecord.points = maxPoints;
+
+        /*
         float perfectSelectedCent = centToPerfectCent(selectedCent);
         // Selecting correct octave
         // STEP 1: If selectedCent is more than one octave away from songKey then change octave
@@ -705,7 +708,77 @@ public class FrequencyAnalyzer {
                 ":songCent:" + songCent
         );
 
-        return centToFreq(selectedCent);
+        return centToFreq(selectedCent);*/
+    }
+
+    // Select correct octave for selected Note and return frequency
+    private double selectCorrectOctave(Record curRecord) {
+
+        int note = centToNote(curRecord.selectedCent);
+        int diff=0, lastNote=-1;
+        int selectedOctave; // some default but will be overwritten
+        float correctedCent;
+        Record lastRecord = null;
+        // If we have (strong signal in) history then use octave based on that.
+        if (pastRecords.size() > 1) {
+            lastRecord = pastRecords.get(pastRecords.size() - 1);
+            lastNote = centToNote(lastRecord.selectedCent);
+            // We assume that cents can ascend to 700 cents but descend to 500
+            // how close are we to current note, also remember A, B note are on prev octave.
+            diff = Math.abs(note - lastNote);
+            // int newNote = lastNote + diff;
+            if(diff <= 7) { // same octave as last
+                 selectedOctave = centToOctave(lastRecord.selectedCent);
+            } else {
+                if(note >= 7) { // we are going below C
+                    selectedOctave = centToOctave(lastRecord.selectedCent) - 1;
+                } else if (lastNote >= 9) {
+                    selectedOctave = centToOctave(lastRecord.selectedCent) + 1;
+                }
+                else {
+                    selectedOctave = centToOctave(lastRecord.selectedCent);
+                }
+            }
+        } else { // If no history use octave based on rootNote
+            diff = Math.abs(note - preferences.rootNote);
+            if(diff <= 7) { // same octave as last
+                selectedOctave = preferences.rootOctave;
+            } else {
+                if(note >= 7) {
+                    selectedOctave = preferences.rootOctave - 1;
+                } else if (preferences.rootNote >= 10) {
+                    selectedOctave = preferences.rootOctave + 1;
+                }
+                else {
+                    selectedOctave = preferences.rootOctave;
+                }
+            }
+        }
+        float error = curRecord.selectedCent - centToPerfectCent(curRecord.selectedCent);
+        correctedCent = octaveToCent(selectedOctave) + note*100 + error;
+
+        if(lastRecord != null) {
+            Log.d("OCTAVE", String.format("curRecord.selectedCent:%d:note:%d:" +
+                            "lastRecord.selectedCent:%d:lastNote:%d:diff:%d:selectedOctave:%d:error:%f:" +
+                            "correctedCent:%d", (int) curRecord.selectedCent, note,
+                    (int) lastRecord.selectedCent, lastNote, diff, selectedOctave, error,
+                    (int) correctedCent));
+        } else {
+            Log.d("OCTAVE", String.format("curRecord.selectedCent:%d:note:%d:" +
+                            "lastRecord.selectedCent:-1:lastNote:%d:diff:%d:selectedOctave:%d:error:%f:" +
+                            "correctedCent:%d", (int) curRecord.selectedCent, note,
+                    lastNote, diff, selectedOctave, error,
+                    (int) correctedCent));
+        }
+
+        curRecord.selectedCent = correctedCent;
+        pastRecords.add(curRecord);
+
+        int historySize = 2; // how much history to keep
+        if(pastRecords.size() > historySize) {
+            pastRecords.remove(0); // remove oldest.
+        }
+        return centToFreq(correctedCent);
     }
 
     // Rating system:

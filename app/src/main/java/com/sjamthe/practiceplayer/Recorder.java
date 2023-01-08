@@ -27,7 +27,7 @@ public class Recorder {
     private static final int FRAME_BUFFER_SIZE = AUDIO_BUFFER_SIZE / 2;
     private short[] data = new short[FRAME_BUFFER_SIZE];
     private AudioRecord record = null;
-    private FrequencyAnalyzer frequencyAnalyzer;
+    public FrequencyAnalyzer frequencyAnalyzer;
 
     public Recorder(FullscreenActivity instance, Context applicationContext) {
         this.fullscreenActivity = instance;

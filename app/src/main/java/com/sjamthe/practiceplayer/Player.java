@@ -106,6 +106,9 @@ public class Player {
         codec.configure(format, null, null, 0);
         frequencyAnalyzer = new FrequencyAnalyzer(sampleRate);
         frequencyAnalyzer.fullscreenActivity = fullscreenActivity;
+        frequencyAnalyzer.setPreferences(fullscreenActivity.rootNote,
+                fullscreenActivity.rootOctave, fullscreenActivity.thaat,
+                fullscreenActivity.minSoundLevel);
         codec.start();
         extractor.selectTrack(0);
 

@@ -8,7 +8,7 @@
             android:entryValues="@array/note_values"
             android:key="root_note"
             android:title="Sa/Root Note/Key"
-            app:useSimpleSummaryProvider="true"/>
+            app:useSimpleSummaryProvider="true" />
 
         <ListPreference
             android:defaultValue="3"
@@ -16,7 +16,7 @@
             android:entryValues="@array/octave_entries"
             android:key="root_octave"
             android:title="Root Octave/Madhya Saptak"
-            app:useSimpleSummaryProvider="true"/>
+            app:useSimpleSummaryProvider="true" />
 
         <ListPreference
             android:defaultValue="bilawal"
@@ -24,7 +24,21 @@
             android:entryValues="@array/thaat_values"
             android:key="thaat"
             android:title="Thaat / Scale"
-            app:useSimpleSummaryProvider="true"/>
+            app:useSimpleSummaryProvider="true" />
 
+    </PreferenceCategory>
+    <PreferenceCategory android:title="Sound Settings">
+
+        <EditTextPreference
+            android:defaultValue="0"
+            android:key="min_sound_level"
+            android:selectAllOnFocus="true"
+            android:singleLine="true"
+            android:title="Minimum Sound Level"
+            app:useSimpleSummaryProvider="true"/>
+        <SwitchPreference
+            android:defaultValue="false"
+            android:key="show_sound_level"
+            android:title="Plot Sound Level on chart" />
     </PreferenceCategory>
 </PreferenceScreen>

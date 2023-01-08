@@ -46,14 +46,14 @@
             android:textStyle="bold" />
 -->
         <TextView
-            android:id="@+id/last_cents"
+            android:id="@+id/swar"
             android:layout_width="match_parent"
             android:layout_height="48dp"
             android:gravity="center"
             android:layout_alignParentStart="true"
             android:textColor="@color/design_default_color_on_primary"
             android:textSize="24dp"
-            android:text="-- key: --" />
+            android:text="" />
 
         <com.github.mikephil.charting.charts.LineChart
             android:id="@+id/activity_main_linechart"
@@ -61,7 +61,18 @@
             android:layout_height="match_parent"
             android:gravity="center"
             android:layout_alignParentStart="true"
-            android:layout_above="@id/start_position"/>
+            android:layout_above="@id/start_position">
+        </com.github.mikephil.charting.charts.LineChart>
+
+        <TextView
+            android:id="@+id/thaat"
+            android:layout_width="match_parent"
+            android:layout_height="24dp"
+            android:gravity="center"
+            android:layout_alignParentStart="true"
+            android:layout_above="@id/seek_position"
+            android:textColor="@color/design_default_color_on_primary"
+            android:text="thaat" />
 
         <TextView
             android:id="@+id/start_position"
@@ -78,11 +89,11 @@
             android:id="@+id/seek_position"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_centerInParent="true"
             android:layout_above="@id/seek_bar"
+            android:layout_centerInParent="true"
             android:layout_marginBottom="0dp"
-            android:textColor="@color/design_default_color_secondary"
-            android:text="0/100" />
+            android:text="0/100"
+            android:textColor="@color/design_default_color_secondary" />
 
         <TextView
             android:id="@+id/stop_position"

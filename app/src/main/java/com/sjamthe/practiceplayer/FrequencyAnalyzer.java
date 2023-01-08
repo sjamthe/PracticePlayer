@@ -718,16 +718,23 @@ public class FrequencyAnalyzer {
         int diff=0, lastNote=-1;
         int selectedOctave; // some default but will be overwritten
         float correctedCent;
+        boolean useHistory = false;
         Record lastRecord = null;
         // If we have (strong signal in) history then use octave based on that.
         if (pastRecords.size() > 1) {
             lastRecord = pastRecords.get(pastRecords.size() - 1);
+            // If pastRecord is recent we can use it as a guide
+            if(lastRecord.pos >= nPitches - 2) {
+                useHistory = true;
+            }
+        }
+        if(useHistory) {
             lastNote = centToNote(lastRecord.selectedCent);
             // We assume that cents can ascend to 700 cents but descend to 500
             // how close are we to current note, also remember A, B note are on prev octave.
             diff = Math.abs(note - lastNote);
             // int newNote = lastNote + diff;
-            if(diff <= 6) { // same octave as last
+            if(diff < 6) { // same octave as last
                  selectedOctave = centToOctave(lastRecord.selectedCent);
             }/* else if(diff > 6 && diff < 7) { // use octave distribution to resolve tie
                 selectedOctave = centToOctave(lastRecord.selectedCent);
@@ -739,7 +746,7 @@ public class FrequencyAnalyzer {
                     selectedOctave = selectedOctave + 1;
                 }
             }*/ else {
-                if(note >= 7) { // we are going below C
+                if(note > 7) { // we are going below C
                     selectedOctave = centToOctave(lastRecord.selectedCent) - 1;
                 } else if (lastNote >= 9) {
                     selectedOctave = centToOctave(lastRecord.selectedCent) + 1;
@@ -750,10 +757,10 @@ public class FrequencyAnalyzer {
             }
         } else { // If no history use octave based on rootNote
             diff = Math.abs(note - preferences.rootNote);
-            if(diff <= 6) { // same octave as last
+            if(diff < 6) {
                 selectedOctave = preferences.rootOctave;
             } else {
-                if(note >= 7) {
+                if(note > 7) {
                     selectedOctave = preferences.rootOctave - 1;
                 } else if (preferences.rootNote >= 10) {
                     selectedOctave = preferences.rootOctave + 1;
@@ -772,7 +779,7 @@ public class FrequencyAnalyzer {
         }
         correctedCent = octaveToCent(selectedOctave) + note*100 + error;
 
-        if(lastRecord != null) {
+        if(useHistory) {
             Log.d("OCTAVE", String.format("nPitches:%d:curRecord.selectedCent:%d:note:%d:" +
                             "lastRecord.selectedCent:%d:lastNote:%d:diff:%d:selectedOctave:%d:error:%f:" +
                             "correctedCent:%d:soundLevel:%d",nPitches, (int) curRecord.selectedCent, note,

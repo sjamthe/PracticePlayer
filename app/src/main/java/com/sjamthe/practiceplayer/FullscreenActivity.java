@@ -432,6 +432,9 @@ public class FullscreenActivity extends AppCompatActivity {
         } else if(cent > 0) {
             lastCents.setText(FrequencyAnalyzer.SWARAS[swar]);
             thaatText.setText(String.format("%s vol:%d", this.thaat, (int) soundLevel));
+        } else {
+            lastCents.setText("-");
+            thaatText.setText(String.format("%s vol:%d", this.thaat, (int) soundLevel));
         }
         //thaatText.setText(String.format("%d - %d",(int)cent, (int) soundLevel)); // DEBUG
     }

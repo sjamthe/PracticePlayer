@@ -123,6 +123,7 @@ public class FullscreenActivity extends AppCompatActivity {
                             // stop old play
                             player.setPlayerState(AudioTrack.PLAYSTATE_STOPPED);
                             resetMarkerPositions();
+                            lineChart.clear();
                         }
                         selectedUri = uri;
 
@@ -754,12 +755,13 @@ public class FullscreenActivity extends AppCompatActivity {
                 lastCents.setVisibility(View.VISIBLE);
                 thaatText.setVisibility(View.VISIBLE);
                 // store frequencyAnalyzer so we can set rootKey etc
+                recorder.startRecording();
                 frequencyAnalyzer = recorder.frequencyAnalyzer;
                 frequencyAnalyzer.setPreferences(rootNote, rootOctave, thaat, minSoundLevel);
-                recorder.startRecording();
                 micButton.setIconResource(R.drawable.ic_baseline_mic_off_24);
             } else {
                 fullscreenContent.setVisibility(View.VISIBLE);
+                lineChart.clear();
                 lineChart.setVisibility(View.GONE);
                 lastCents.setVisibility(View.GONE);
                 thaatText.setVisibility(View.GONE);

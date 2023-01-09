@@ -26,27 +26,17 @@ public class NoteSettingsActivity extends AppCompatActivity {
         }
     }
 
+    // Supports back button from Settings
+    @Override
+    public boolean onSupportNavigateUp(){
+        finish();
+        return true;
+    }
+
     public static class SettingsFragment extends PreferenceFragmentCompat {
         @Override
         public void onCreatePreferences(Bundle savedInstanceState, String rootKey) {
             setPreferencesFromResource(R.xml.note_preferences, rootKey);
-/*
-            Preference rootNote = findPreference("root_note");
-            rootNote.setOnPreferenceChangeListener((preference, newVal) -> {
-                String value = (String) newVal;
-                return true;
-            });*/
         }
-
-        /*
-        @Override
-        public boolean onPreferenceTreeClick(Preference preference ) {
-            switch (preference.getKey()) {
-                default:
-                    return super.onPreferenceTreeClick(preference);
-            }
-            //return true;
-        }*/
     }
-
 }

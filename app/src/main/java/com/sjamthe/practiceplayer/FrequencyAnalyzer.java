@@ -5,7 +5,6 @@ import android.util.Log;
 import androidx.annotation.NonNull;
 
 import java.text.DecimalFormat;
-import java.text.Format;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -379,6 +378,10 @@ public class FrequencyAnalyzer {
         // detector = new McLeodPitchMethod((float) this.samplingSize, this.fftSize);// better than Yin
     }
 
+    // Reset all counters etc.
+    public void reset() {
+
+    }
     private final Runnable runUpdateChart = new Runnable() {
         @Override
         public void run() {

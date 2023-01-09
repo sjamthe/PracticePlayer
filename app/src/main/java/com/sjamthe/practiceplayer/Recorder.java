@@ -32,8 +32,6 @@ public class Recorder {
     public Recorder(FullscreenActivity instance, Context applicationContext) {
         this.fullscreenActivity = instance;
         this.applicationContext = applicationContext;
-        this.frequencyAnalyzer = new FrequencyAnalyzer(SAMPLE_RATE);
-        this.frequencyAnalyzer.fullscreenActivity = this.fullscreenActivity;
     }
 
     public boolean checkPermissions() {
@@ -54,6 +52,10 @@ public class Recorder {
         if (!checkPermissions()) {
             requestPermissions();
         }
+        // here so we get a new FrequencyAnalyzer every time with reset counters.
+        this.frequencyAnalyzer = new FrequencyAnalyzer(SAMPLE_RATE);
+        this.frequencyAnalyzer.fullscreenActivity = this.fullscreenActivity;
+
         this.record = new AudioRecord(MediaRecorder.AudioSource.VOICE_PERFORMANCE,
                 SAMPLE_RATE, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT,
                 AUDIO_BUFFER_SIZE);
@@ -68,6 +70,7 @@ public class Recorder {
             this.record.stop();
             this.record.release();
             this.record = null;
+            this.frequencyAnalyzer = null;
         }
     }
 

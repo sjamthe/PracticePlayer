@@ -15,6 +15,19 @@
         android:theme="@style/Theme.PracticePlayer"
         tools:targetApi="31">
         <activity
+            android:name=".SwarPracticeActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+
+            <meta-data
+                android:name="android.app.lib_name"
+                android:value="" />
+        </activity>
+        <activity
             android:name=".NoteSettingsActivity"
             android:exported="false"
             android:label="@string/title_activity_note_settings">
@@ -26,7 +39,6 @@
             android:name=".FullscreenActivity"
             android:configChanges="orientation|keyboardHidden|screenSize"
             android:exported="true"
-            android:label="@string/app_name"
             android:theme="@style/Theme.PracticePlayer.Fullscreen">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

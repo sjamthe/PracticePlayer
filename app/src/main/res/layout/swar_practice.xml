@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <TextView
+        android:id="@+id/swarPracticeTitle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="20dp"
+        android:ems="10"
+        android:minHeight="40dp"
+        android:text="@string/swar_practice"
+        android:textColor="@color/design_default_color_primary"
+        android:textSize="32sp"
+        android:textAlignment="center"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintHorizontal_bias="0.5"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <ImageView
+        android:id="@+id/imageView"
+        android:layout_width="180dp"
+        android:layout_height="180dp"
+        android:layout_marginTop="20dp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/swarPracticeTitle"
+        app:srcCompat="@android:drawable/ic_menu_gallery"
+        android:contentDescription="@string/noteText" />
+
+    <TextView
+        android:id="@+id/start_cent_error"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="0 E"
+        android:textColor="#ffcc0000"
+        android:textAlignment="textEnd"
+        android:textSize="20sp"
+        app:layout_constraintEnd_toStartOf="@+id/imageView"
+        app:layout_constraintTop_toTopOf="@+id/imageView" />
+    <TextView
+        android:id="@+id/enf_cent_error"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="0 E"
+        android:textColor="#ffcc0000"
+        android:textAlignment="textStart"
+        android:textSize="20sp"
+        app:layout_constraintStart_toEndOf="@+id/imageView"
+        app:layout_constraintTop_toTopOf="@+id/imageView" />
+
+    <TextView
+        android:id="@+id/vol_sd"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="vol 0 E"
+        android:textColor="#ff007700"
+        android:textAlignment="textEnd"
+        android:textSize="20sp"
+        app:layout_constraintEnd_toStartOf="@+id/imageView"
+        app:layout_constraintBottom_toBottomOf="@+id/imageView" />
+
+    <TextView
+        android:id="@+id/duration"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="0 secs"
+        android:textColor="#ff007700"
+        android:textAlignment="textEnd"
+        android:textSize="20sp"
+        app:layout_constraintStart_toEndOf="@+id/imageView"
+        app:layout_constraintBottom_toBottomOf="@+id/imageView" />
+
+    <com.github.mikephil.charting.charts.LineChart
+        android:id="@+id/swar_practice_linechart"
+        android:layout_width="343dp"
+        android:layout_height="231dp"
+        android:layout_marginTop="40dp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/imageView">
+    </com.github.mikephil.charting.charts.LineChart>
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/swar_mic_button"
+        style="@style/Widget.MaterialComponents.Button.Icon"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:layout_marginBottom="10dp"
+        android:contentDescription="@string/mic_button"
+        app:icon="@drawable/ic_baseline_mic_on_24"
+        app:iconGravity="textTop"
+        android:textAlignment="center"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent" />
+</androidx.constraintlayout.widget.ConstraintLayout>

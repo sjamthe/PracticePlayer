@@ -2,7 +2,11 @@
 <menu xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
 <item android:id="@+id/scale"
-    android:title="Scale"
+    android:title="Swar"
     android:icon="@drawable/ic_baseline_music_note_24"
     app:showAsAction="ifRoom" />
+    <item android:id="@+id/settings"
+        android:title="Settings"
+        android:icon="@drawable/ic_baseline_settings_24"
+        app:showAsAction="ifRoom" />
 </menu>

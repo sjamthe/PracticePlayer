@@ -81,6 +81,7 @@ public class FrequencyAnalyzer {
         double soundLevel;
         float selectedCent; // the cents that was finally selected.
         double points; // Points acquired
+        boolean rising; // Set to true if prev different note was lower else false
     };
     ArrayList<Record> futureRecords = new ArrayList<Record>();
     ArrayList<Record> pastRecords = new ArrayList<Record>();
@@ -645,73 +646,17 @@ public class FrequencyAnalyzer {
             }
         }
 
-        //Store the curRecord in pastRecords
+        if(pastRecords.size() > 1) {
+            Record lastRecord = pastRecords.get(pastRecords.size()-1);
+            if(lastRecord.selectedCent < selectedCent)
+                curRecord.rising = true;
+            else if(lastRecord.selectedCent > selectedCent)
+                curRecord.rising = false;
+            else
+                curRecord.rising = lastRecord.rising;
+        }
         curRecord.selectedCent = selectedCent;
         curRecord.points = maxPoints;
-
-        /*
-        float perfectSelectedCent = centToPerfectCent(selectedCent);
-        // Selecting correct octave
-        // STEP 1: If selectedCent is more than one octave away from songKey then change octave
-        // so it is in the same octave as songKey.
-        if(this.songCent >= 0 && perfectSelectedCent != this.songCent) {
-            if (Math.abs(centToOctave(selectedCent) - centToOctave(this.songCent)) > 1) {
-                selectedCent =  centToOctave(this.songCent)*1200 + selectedCent % 1200;
-            }
-            // STEP 2: Now that the key is withing one octave of songKey see if the is closer to
-            // songOctave or an songKey an octave above or below. the octave that has lowest
-            float octaveAbove = centToPerfectCent(selectedCent) + 1200;
-            float octaveBelow = centToPerfectCent(selectedCent) - 1200;
-            if (Math.abs(octaveAbove - this.songCent)
-                    < Math.abs(selectedCent - this.songCent)) {
-                selectedCent = selectedCent + 1200;
-            } else if (Math.abs(octaveBelow - this.songCent)
-                    < Math.abs(selectedCent - this.songCent)) {
-                selectedCent = selectedCent - 1200;
-            }
-        }
-        // STEP 3: If we have history of strong signal (above average) and current signal is
-        // strong, then the current pitch should be closer.
-
-        perfectSelectedCent = centToPerfectCent(selectedCent);
-        if (pastRecords.size() > 1) {
-            double averageSoundLevel = totalSoundLevel / (nPitches + 1);
-            Record lastRecord = pastRecords.get(pastRecords.size() - 1);
-            float octaveAbove = perfectSelectedCent + 1200;
-            float octaveBelow = perfectSelectedCent - 1200;
-            if (Math.abs(octaveAbove - lastRecord.selectedCent)
-                    < Math.abs(perfectSelectedCent - lastRecord.selectedCent)) {
-                selectedCent = selectedCent + 1200;
-            } else if (Math.abs(octaveBelow - lastRecord.selectedCent)
-                    < Math.abs(perfectSelectedCent - lastRecord.selectedCent)) {
-                selectedCent = selectedCent - 1200;
-            }
-        }
-
-        //Store the curRecord in pastRecords
-        curRecord.selectedCent = selectedCent;
-        curRecord.points = maxPoints;
-        pastRecords.add(curRecord);
-        if(pastRecords.size() > historySize) {
-            pastRecords.remove(0); // remove oldest.
-        }
-
-        // Logging
-        String centsStr = LogStr("cents", curRecord.cents);
-        String acfsStr = LogStr("acfs", curRecord.acfs);
-        String histPointStr = LogStr("histPoints", histPoints);
-        String futurePointStr = LogStr("futurePoints", futurePoints);
-        DecimalFormat df = new DecimalFormat("###.##");
-        Log.d("POINTS", nPitches +  ":maxPoints:" + df.format(maxPoints) +
-                ":soundLevel:" + df.format(soundLevel) +
-                ":Note:" + centToNote(selectedCent) +
-                ":perfectCent:" + centToPerfectCent(selectedCent) +
-                ":selectedIndex:" + selectedIndex +
-                centsStr + histPointStr + futurePointStr + acfsStr +
-                ":songCent:" + songCent
-        );
-
-        return centToFreq(selectedCent);*/
     }
 
     // Select correct octave for selected Note and return frequency
@@ -726,8 +671,8 @@ public class FrequencyAnalyzer {
         // If we have (strong signal in) history then use octave based on that.
         if (pastRecords.size() > 1) {
             lastRecord = pastRecords.get(pastRecords.size() - 1);
-            // If pastRecord is recent we can use it as a guide
-            if(lastRecord.pos >= nPitches - 2) {
+            // If pastRecord is recent we can use it as a guide (5 because we start analyzing at 3)
+            if(lastRecord.pos > nPitches - 5) {
                 useHistory = true;
             }
         }
@@ -737,24 +682,30 @@ public class FrequencyAnalyzer {
             // how close are we to current note, also remember A, B note are on prev octave.
             diff = Math.abs(note - lastNote);
             // int newNote = lastNote + diff;
-            if(diff < 6) { // same octave as last
-                 selectedOctave = centToOctave(lastRecord.selectedCent);
-            }/* else if(diff > 6 && diff < 7) { // use octave distribution to resolve tie
-                selectedOctave = centToOctave(lastRecord.selectedCent);
-                if(octaveNotesDistribution[selectedOctave][note] <
-                        octaveNotesDistribution[selectedOctave - 1][note]) {
-                    selectedOctave = selectedOctave -1;
-                } else if(octaveNotesDistribution[selectedOctave][note] <
-                        octaveNotesDistribution[selectedOctave + 1][note]) {
-                    selectedOctave = selectedOctave + 1;
-                }
-            }*/ else {
-                if(note > 7) { // we are going below C
-                    selectedOctave = centToOctave(lastRecord.selectedCent) - 1;
-                } else if (lastNote >= 9) {
+            if(diff <= 6) { // same octave as last
+                if(lastNote >= 6 && note < lastNote && lastRecord.rising) {
                     selectedOctave = centToOctave(lastRecord.selectedCent) + 1;
+                    curRecord.rising = true;
+                } else if(note < 6 && note < lastNote) {
+                    selectedOctave = centToOctave(lastRecord.selectedCent) - 1;
                 }
                 else {
+                    selectedOctave = centToOctave(lastRecord.selectedCent);
+                }
+            } else {
+                if(note > 7) { // we are going below C
+                    if(lastRecord.rising) {
+                        selectedOctave = centToOctave(lastRecord.selectedCent) + 1;
+                        curRecord.rising = true;
+                    } else {
+                        selectedOctave = centToOctave(lastRecord.selectedCent) - 1;
+                        curRecord.rising = false;
+                    }
+                    // no chance to be in the same octave?
+                } else if (lastNote >= 9 & note < 9) { // no check for rising?
+                    selectedOctave = centToOctave(lastRecord.selectedCent) + 1;
+                    curRecord.rising = true;
+                } else {
                     selectedOctave = centToOctave(lastRecord.selectedCent);
                 }
             }

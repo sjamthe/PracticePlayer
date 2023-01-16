@@ -520,9 +520,12 @@ public class FullscreenActivity extends AppCompatActivity {
     @Override
     public boolean onOptionsItemSelected(@NonNull MenuItem item) {
         switch (item.getItemId()) {
+            case R.id.swar_gyan:
+                Intent i = new Intent(this, SwarPracticeActivity.class);
+                startActivity(i);
+                return true;
             case R.id.settings:
-                //Toast.makeText(this, "scale ha ha", Toast.LENGTH_SHORT).show();
-                Intent i = new Intent(this, NoteSettingsActivity.class);
+                i = new Intent(this, NoteSettingsActivity.class);
                 startActivity(i);
                 return true;
             default:

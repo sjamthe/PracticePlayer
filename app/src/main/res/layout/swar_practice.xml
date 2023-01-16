@@ -21,16 +21,47 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
 
-    <ImageView
-        android:id="@+id/imageView"
+    <com.sjamthe.practiceplayer.SwarView
+        android:id="@+id/swar_image_view"
         android:layout_width="180dp"
         android:layout_height="180dp"
         android:layout_marginTop="20dp"
+        android:background="@color/design_default_color_background"
+        android:contentDescription="@string/noteText"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@+id/swarPracticeTitle"
-        app:srcCompat="@android:drawable/ic_menu_gallery"
-        android:contentDescription="@string/noteText" />
+        app:srcCompat="@android:drawable/ic_menu_gallery" />
+
+    <TextView
+        android:id="@+id/swar_text"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="-"
+        android:textAlignment="textEnd"
+        android:textColor="@color/design_default_color_primary"
+        android:textSize="64sp"
+        app:layout_constraintBottom_toBottomOf="@+id/swar_image_view"
+        app:layout_constraintEnd_toEndOf="@+id/swar_image_view"
+        app:layout_constraintHorizontal_bias=".5"
+        app:layout_constraintStart_toStartOf="@+id/swar_image_view"
+        app:layout_constraintTop_toTopOf="@+id/swar_image_view"
+        app:layout_constraintVertical_bias="0.35" />
+
+    <TextView
+        android:id="@+id/avg_cent_error"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="0 E"
+        android:textAlignment="textEnd"
+        android:textColor="#ffcc0000"
+        android:textSize="24sp"
+        app:layout_constraintBottom_toBottomOf="@+id/swar_image_view"
+        app:layout_constraintEnd_toEndOf="@+id/swar_image_view"
+        app:layout_constraintHorizontal_bias=".5"
+        app:layout_constraintStart_toStartOf="@+id/swar_image_view"
+        app:layout_constraintTop_toTopOf="@+id/swar_image_view"
+        app:layout_constraintVertical_bias="0.75" />
 
     <TextView
         android:id="@+id/start_cent_error"
@@ -40,40 +71,46 @@
         android:textColor="#ffcc0000"
         android:textAlignment="textEnd"
         android:textSize="20sp"
-        app:layout_constraintEnd_toStartOf="@+id/imageView"
-        app:layout_constraintTop_toTopOf="@+id/imageView" />
+        app:layout_constraintEnd_toStartOf="@+id/swar_image_view"
+        app:layout_constraintTop_toTopOf="@+id/swar_image_view" />
+
     <TextView
-        android:id="@+id/enf_cent_error"
+        android:id="@+id/cent_error_sd"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="0 E"
+        android:text="0 SD"
         android:textColor="#ffcc0000"
         android:textAlignment="textStart"
         android:textSize="20sp"
-        app:layout_constraintStart_toEndOf="@+id/imageView"
-        app:layout_constraintTop_toTopOf="@+id/imageView" />
+        app:layout_constraintStart_toEndOf="@+id/swar_image_view"
+        app:layout_constraintTop_toTopOf="@+id/swar_image_view" />
 
     <TextView
         android:id="@+id/vol_sd"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="vol 0 E"
+        android:text="vol 0 SD"
+        android:textAlignment="center"
         android:textColor="#ff007700"
-        android:textAlignment="textEnd"
         android:textSize="20sp"
-        app:layout_constraintEnd_toStartOf="@+id/imageView"
-        app:layout_constraintBottom_toBottomOf="@+id/imageView" />
+        app:layout_constraintBottom_toBottomOf="@+id/swar_image_view"
+        app:layout_constraintEnd_toStartOf="@+id/avg_cent_error"
+        app:layout_constraintHorizontal_bias="0.56"
+        app:layout_constraintStart_toStartOf="parent" />
 
     <TextView
         android:id="@+id/duration"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
+        android:layout_marginStart="103dp"
         android:text="0 secs"
-        android:textColor="#ff007700"
         android:textAlignment="textEnd"
+        android:textColor="#ff007700"
         android:textSize="20sp"
-        app:layout_constraintStart_toEndOf="@+id/imageView"
-        app:layout_constraintBottom_toBottomOf="@+id/imageView" />
+        app:layout_constraintBottom_toBottomOf="@+id/swar_image_view"
+        app:layout_constraintEnd_toStartOf="parent"
+        app:layout_constraintHorizontal_bias="0.117"
+        app:layout_constraintStart_toEndOf="@+id/avg_cent_error" />
 
     <com.github.mikephil.charting.charts.LineChart
         android:id="@+id/swar_practice_linechart"
@@ -82,7 +119,7 @@
         android:layout_marginTop="40dp"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/imageView">
+        app:layout_constraintTop_toBottomOf="@+id/swar_image_view">
     </com.github.mikephil.charting.charts.LineChart>
 
     <com.google.android.material.button.MaterialButton

@@ -46,6 +46,7 @@ https://github.com/cuthbertLab/music21/blob/master/music21/analysis/discrete.py
 public class FrequencyAnalyzer {
     // private final PitchDetector detector;
     FullscreenActivity fullscreenActivity;
+    SwarPracticeActivity swarPracticeActivity;
 
     //static final double VOLUME_THRESHOLD = 500;
 
@@ -74,7 +75,7 @@ public class FrequencyAnalyzer {
         return Math.log(d) / Math.log(2.0d);
     }
 
-    public static class Record {
+    private static class Record {
         int pos;
         float[] cents;
         double[] acfs;
@@ -383,10 +384,19 @@ public class FrequencyAnalyzer {
     public void reset() {
 
     }
+
     private final Runnable runUpdateChart = new Runnable() {
         @Override
         public void run() {
             fullscreenActivity.updateChart(lastCent, songCent, (float) soundLevel,
+                    (float) (totalSoundLevel/(nPitches+1)));
+        }
+    };
+
+    private final Runnable runUpdateSwarActivity = new Runnable() {
+        @Override
+        public void run() {
+            swarPracticeActivity.updateChart(lastCent, songCent, (float) soundLevel,
                     (float) (totalSoundLevel/(nPitches+1)));
         }
     };
@@ -493,6 +503,9 @@ public class FrequencyAnalyzer {
 
         if(fullscreenActivity != null && fullscreenActivity.fullScreenHandler != null)
             fullscreenActivity.fullScreenHandler.post(runUpdateChart);
+        else if(swarPracticeActivity != null && swarPracticeActivity.fullScreenHandler != null)
+            swarPracticeActivity.fullScreenHandler.post(runUpdateSwarActivity);
+
         // After analysis set analyze position for the next analyze call
         analyzePos += analyzeSize;
         analyzePos = analyzePos % inputBuffer.length; // don't exceed inputBuffer.length
@@ -733,7 +746,7 @@ public class FrequencyAnalyzer {
         }
         correctedCent = octaveToCent(selectedOctave) + note*100 + error;
 
-        if(useHistory) {
+     /*   if(useHistory) {
             Log.d("OCTAVE", String.format("nPitches:%d:curRecord.selectedCent:%d:note:%d:" +
                             "lastRecord.selectedCent:%d:lastNote:%d:diff:%d:selectedOctave:%d:error:%f:" +
                             "correctedCent:%d:soundLevel:%d",nPitches, (int) curRecord.selectedCent, note,
@@ -745,7 +758,7 @@ public class FrequencyAnalyzer {
                             "correctedCent:%d:soundLevel:%d",nPitches, (int) curRecord.selectedCent, note,
                     lastNote, diff, selectedOctave, error,
                     (int) correctedCent, (int) soundLevel));
-        }
+        }*/
 
         curRecord.selectedCent = correctedCent;
         pastRecords.add(curRecord);

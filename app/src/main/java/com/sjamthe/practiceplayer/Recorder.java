@@ -1,10 +1,9 @@
 package com.sjamthe.practiceplayer;
 
 import static android.Manifest.permission.RECORD_AUDIO;
-import static android.Manifest.permission.WRITE_EXTERNAL_STORAGE;
 
-import android.Manifest;
 import android.annotation.SuppressLint;
+import android.app.Activity;
 import android.content.Context;
 import android.content.pm.PackageManager;
 import android.media.AudioFormat;
@@ -17,7 +16,8 @@ import androidx.core.content.ContextCompat;
 public class Recorder {
     private int RECORD_BUFFER_SIZE;
     Context applicationContext;
-    FullscreenActivity fullscreenActivity;
+    //FullscreenActivity fullscreenActivity;
+    Activity activity;
     // constant for storing audio permission
     public static final int REQUEST_AUDIO_PERMISSION_CODE = 1;
     private Notification notification = new Notification();
@@ -29,8 +29,8 @@ public class Recorder {
     private AudioRecord record = null;
     public FrequencyAnalyzer frequencyAnalyzer;
 
-    public Recorder(FullscreenActivity instance, Context applicationContext) {
-        this.fullscreenActivity = instance;
+    public Recorder(Activity instance, Context applicationContext) {
+        this.activity = instance;
         this.applicationContext = applicationContext;
     }
 
@@ -42,7 +42,7 @@ public class Recorder {
 
     public void requestPermissions() {
         // this method is used to request the permission for audio recording.
-        ActivityCompat.requestPermissions(this.fullscreenActivity, new String[]{
+        ActivityCompat.requestPermissions(this.activity, new String[]{
                 RECORD_AUDIO}, REQUEST_AUDIO_PERMISSION_CODE);
     }
 
@@ -54,7 +54,7 @@ public class Recorder {
         }
         // here so we get a new FrequencyAnalyzer every time with reset counters.
         this.frequencyAnalyzer = new FrequencyAnalyzer(SAMPLE_RATE);
-        this.frequencyAnalyzer.fullscreenActivity = this.fullscreenActivity;
+        //this.frequencyAnalyzer.fullscreenActivity = this.activity;
 
         this.record = new AudioRecord(MediaRecorder.AudioSource.VOICE_PERFORMANCE,
                 SAMPLE_RATE, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT,

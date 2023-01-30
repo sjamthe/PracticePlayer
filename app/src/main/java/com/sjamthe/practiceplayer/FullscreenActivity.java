@@ -760,6 +760,7 @@ public class FullscreenActivity extends AppCompatActivity {
                 // store frequencyAnalyzer so we can set rootKey etc
                 recorder.startRecording();
                 frequencyAnalyzer = recorder.frequencyAnalyzer;
+                frequencyAnalyzer.fullscreenActivity = instance; // moved out of Recorder
                 frequencyAnalyzer.setPreferences(rootNote, rootOctave, thaat, minSoundLevel);
                 micButton.setIconResource(R.drawable.ic_baseline_mic_off_24);
             } else {

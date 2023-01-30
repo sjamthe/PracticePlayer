@@ -15,6 +15,7 @@ import android.widget.TextView;
 public class SwarView extends View {
 
     private float minCentAngle, maxCentAngle, curCentAngle;
+    private Canvas canvas;
 
     public SwarView(Context context) {
         super(context);

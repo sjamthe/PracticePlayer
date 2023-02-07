@@ -4,27 +4,22 @@ import androidx.appcompat.app.ActionBar;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.preference.PreferenceManager;
 
-import android.content.Context;
 import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
-import android.view.View;
 import android.widget.TextView;
-import android.widget.Toast;
 
 import com.google.android.material.button.MaterialButton;
-
-import java.util.concurrent.locks.ReentrantLock;
 
 public class SwarPracticeActivity extends AppCompatActivity {
 
     private SwarView swarView;
     private TextView scaleText, avgCentErrorText, startCentErrorText, centErrorSDText, volSDPctText;
     private TextView durationText, swarText;
-    private int minCentError, maxCentError, curCentError, avgCentError, centSD, startCentError;
-    private int volSDPct, nPitches, totalCentError, swarCounter, swar;
+    private int minCentError, maxCentError, curCentError, avgCentError, centErrorSD, startCentError;
+    private int volSDPct, totalVol, nPitches, totalCentError, swarCounter, swar;
     private int prevSwar = -1;
     float elapsedTimeInSecs;
     private MaterialButton micButton;
@@ -37,6 +32,8 @@ public class SwarPracticeActivity extends AppCompatActivity {
     private String thaat;
     private Boolean showSoundLevel;
     private String minSoundLevel;
+    private float curSoundLevel = 0;
+
     private boolean settingsChanged = false;
     private class Record {
         int position;
@@ -92,10 +89,11 @@ public class SwarPracticeActivity extends AppCompatActivity {
         maxCentError = 0;
         avgCentError = 0;
         startCentError = 0;
-        centSD = 0;
+        centErrorSD = 0;
         volSDPct = 0;
         elapsedTimeInSecs = 0;
         totalCentError = 0;
+        totalVol = 0;
     }
 
     @Override
@@ -119,7 +117,7 @@ public class SwarPracticeActivity extends AppCompatActivity {
                 frequencyAnalyzer.swarPracticeActivity = this;
                 readSettings();
                 micButton.setIconResource(R.drawable.ic_baseline_mic_off_24);
-                records = new Record[10];
+                records = new Record[150];
                 for (int i=0; i<records.length; i++) {
                     records[i] = new Record();
                     records[i].swar = -1;
@@ -156,8 +154,6 @@ public class SwarPracticeActivity extends AppCompatActivity {
             thaat = newThaat;
             this.minSoundLevel = minSoundLevel;
             this.showSoundLevel = showSoundLevel;
-            String noteString = FrequencyAnalyzer.NOTES[Integer.parseInt(rootNote)];
-            scaleText.setText(String.format("scale: %s", noteString));
         }
         frequencyAnalyzer.setPreferences(rootNote, rootOctave, thaat, minSoundLevel);
         return change;
@@ -176,6 +172,7 @@ public class SwarPracticeActivity extends AppCompatActivity {
         records[pos].position = nPitches;
         records[pos].cent = cent;
         records[pos].soundLevel = soundLevel;
+        curSoundLevel = soundLevel;
 
         if(cent > 0) {
             swar = (FrequencyAnalyzer.centToNote(cent)
@@ -218,9 +215,11 @@ public class SwarPracticeActivity extends AppCompatActivity {
             maxCentError = curCentError;
         totalCentError += curCentError; // Not absolute value
         avgCentError = totalCentError / swarCounter;
+        totalVol += curSoundLevel;
 
         elapsedTimeInSecs = swarCounter * 1F / FrequencyAnalyzer.ANALYZE_SAMPLES_PER_SECOND;
         if(swarCounter >= 2) {
+            calcSD();
             updateView();
         }
 
@@ -230,13 +229,45 @@ public class SwarPracticeActivity extends AppCompatActivity {
         nPitches++;
     }
 
+    private void calcSD() {
+        float totalCentErrorDiff = 0;
+        float totalVolDiff = 0;
+        int pos = (nPitches) % records.length;
+        for (int i=0; (i<swarCounter && i < records.length); i++) {
+            int loc = pos - i;
+            if (loc < 0)
+                loc = records.length + loc;
+            int err = (int) (records[loc].cent
+                    - Math.round(records[loc].cent / 100) * 100);
+            totalCentErrorDiff += Math.pow(err - avgCentError, 2);
+            // Log.i("SD", "err:" + err + " totalCentErrorDiff:" + totalCentErrorDiff);
+
+            // Calculate volume error
+            err = (int) (records[loc].soundLevel - totalVol/swarCounter);
+            totalVolDiff += Math.pow(err, 2);
+        }
+        centErrorSD = (int) Math.sqrt(totalCentErrorDiff/(swarCounter-1));
+        volSDPct = (int) (100*Math.sqrt(totalVolDiff/(swarCounter-1))/(totalVol/swarCounter));
+    }
+
     // update view only if swarCounter >= 3 so we don't lose old data on screen
     private void updateView() {
-        swarView.setCentError(minCentError, maxCentError, curCentError);
+        String noteString = "-";
+        if(rootNote != null)
+            noteString = FrequencyAnalyzer.NOTES[Integer.parseInt(rootNote)];
+
+        float avgVol = 0;
+        if(swarCounter > 0)
+            avgVol = totalVol/swarCounter;
+
+        scaleText.setText(String.format("scale: %s vol:%.0f", noteString, avgVol));
+
+        swarView.setCentError(minCentError, maxCentError, curCentError, avgCentError, centErrorSD);
         swarView.invalidate(); // to call draw again
         startCentErrorText.setText(String.format("%d E", startCentError));
+        // avgCentErrorText.setText(String.format("%d E", avgCentError));
         avgCentErrorText.setText(String.format("%d E", avgCentError));
-        centErrorSDText.setText(String.format("%d SD", centSD));
+        centErrorSDText.setText(String.format("%d SD", centErrorSD));
         volSDPctText.setText(String.format("vol %d%% SD", volSDPct));
         durationText.setText(String.format("%.1f secs", elapsedTimeInSecs));
         if(swar >= 0)

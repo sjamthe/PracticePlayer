@@ -27,7 +27,8 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="scale: - vol: -"
-        android:textSize="24sp"
+        android:textColor="@color/design_default_color_primary"
+        android:textSize="20sp"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintHorizontal_bias="0.5"
         app:layout_constraintStart_toStartOf="parent"
@@ -66,7 +67,7 @@
         android:layout_height="wrap_content"
         android:text="0 E"
         android:textAlignment="textEnd"
-        android:textColor="#ffcc0000"
+        android:textColor="@color/red"
         android:textSize="24sp"
         app:layout_constraintBottom_toBottomOf="@+id/swar_image_view"
         app:layout_constraintEnd_toEndOf="@+id/swar_image_view"
@@ -80,7 +81,7 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="0 E"
-        android:textColor="#ffcc0000"
+        android:textColor="@color/red"
         android:textAlignment="textEnd"
         android:textSize="20sp"
         app:layout_constraintEnd_toStartOf="@+id/swar_image_view"
@@ -91,7 +92,7 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="0 SD"
-        android:textColor="#ffcc0000"
+        android:textColor="@color/red"
         android:textAlignment="textStart"
         android:textSize="20sp"
         app:layout_constraintStart_toEndOf="@+id/swar_image_view"
@@ -151,6 +152,6 @@
         android:insetBottom="0dp"
         android:insetLeft="0dp"
         android:insetRight="0dp"
-        app:backgroundTint="#ffcc0000"/>
+        app:backgroundTint="@color/design_default_color_primary"/>
 
 </androidx.constraintlayout.widget.ConstraintLayout>

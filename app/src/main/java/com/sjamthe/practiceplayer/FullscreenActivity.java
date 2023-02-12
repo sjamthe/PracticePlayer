@@ -15,6 +15,7 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.provider.OpenableColumns;
+import android.util.Log;
 import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
@@ -387,7 +388,8 @@ public class FullscreenActivity extends AppCompatActivity {
             lineData.addDataSet(set);
             //lineChart.zoom(1f, 1.5f, 0, 0, YAxis.AxisDependency.RIGHT);
         }
-        set.addEntry(new Entry(set.getEntryCount(), cent));
+        int x = set.getEntryCount();
+        set.addEntry(new Entry(x, cent));
 
         //Add soundLevel data
         ILineDataSet set1 = lineData.getDataSetByIndex(1);
@@ -397,7 +399,7 @@ public class FullscreenActivity extends AppCompatActivity {
         }
         if (this.showSoundLevel) {
             lineChart.getAxisLeft().setEnabled(true);
-            set1.addEntry(new Entry(set.getEntryCount(), soundLevel));
+            set1.addEntry(new Entry(x, soundLevel));
         } else {
             lineChart.getAxisLeft().setEnabled(false);
         }
@@ -425,6 +427,8 @@ public class FullscreenActivity extends AppCompatActivity {
             thaatText.setText(String.format("key:%s %s vol:%d",
                     FrequencyAnalyzer.NOTES[FrequencyAnalyzer.centToNote(songCent)],
                     this.thaat, (int) soundLevel));
+            Log.d("MAIN", x + ":swar:" + FrequencyAnalyzer.SWARAS[swar] + ":cent:"+
+                    cent + ":vol:" + soundLevel);
         } else if (songCent >= 0){
             lastCents.setText("-");
             thaatText.setText(String.format("key:%s %s vol:%d",

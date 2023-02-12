@@ -128,11 +128,13 @@
     <com.github.mikephil.charting.charts.LineChart
         android:id="@+id/swar_practice_linechart"
         android:layout_width="341dp"
-        android:layout_height="209dp"
         android:layout_marginTop="40dp"
+        android:layout_height="309dp"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/swar_image_view"></com.github.mikephil.charting.charts.LineChart>
+        app:layout_constraintTop_toBottomOf="@+id/swar_image_view"
+        app:layout_constraintBottom_toTopOf="@id/swar_mic_button" >
+    </com.github.mikephil.charting.charts.LineChart>
 
     <com.google.android.material.button.MaterialButton
         android:id="@+id/swar_mic_button"

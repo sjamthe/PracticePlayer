@@ -431,9 +431,10 @@ public class FrequencyAnalyzer {
             }
         }
         if(nPitches >= 3) {
-            // NO: We lab the display by 3 pitches so we can correct n-3 by looking forward
-            // NO displayCent = centBuffer[(nPitches - 3)%pitchBuffer.length];
+            //  We lag the display by 3 pitches so we can correct n-3 by looking forward
+            // displayCent = centBuffer[(nPitches - 3)%pitchBuffer.length];
             // read data that was analyzed but same size that came in
+            // TODO(sjamthe): We should not lag when we are on lic mic only on recoding
             resOut = new short[res.length];
             for (int i = 0; i < resOut.length; i++) {
                 resOut[i] = inputBuffer[readPos%inputBuffer.length];;

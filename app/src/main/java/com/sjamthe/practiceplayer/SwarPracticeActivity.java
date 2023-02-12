@@ -66,17 +66,6 @@ public class SwarPracticeActivity extends AppCompatActivity {
             // Show back button
             actionBar.setDisplayHomeAsUpEnabled(true);
         }
-        scaleText = findViewById(R.id.scale_text);
-        swarView = findViewById(R.id.swar_image_view);
-        startCentErrorText = findViewById(R.id.start_cent_error);
-        avgCentErrorText = findViewById(R.id.avg_cent_error);
-        centErrorSDText = findViewById(R.id.cent_error_sd);
-        volSDPctText = findViewById(R.id.vol_sd);
-        durationText = findViewById(R.id.duration);
-        swarText = findViewById(R.id.swar_text);
-        lineChart = findViewById(R.id.swar_practice_linechart);
-        lineChart.setVisibility(View.VISIBLE);
-        createChart();
 
         fullScreenHandler = new Handler(Looper.myLooper());
         recorder = new Recorder(this, getApplicationContext());
@@ -87,6 +76,19 @@ public class SwarPracticeActivity extends AppCompatActivity {
         micButton.setCheckable(true);
         micButton.setToggleCheckedStateOnClick(true);
         micButton.setOnClickListener(v -> toggleMic());
+
+        scaleText = findViewById(R.id.scale_text);
+        swarView = findViewById(R.id.swar_image_view);
+        startCentErrorText = findViewById(R.id.start_cent_error);
+        avgCentErrorText = findViewById(R.id.avg_cent_error);
+        centErrorSDText = findViewById(R.id.cent_error_sd);
+        volSDPctText = findViewById(R.id.vol_sd);
+        durationText = findViewById(R.id.duration);
+        swarText = findViewById(R.id.swar_text);
+        lineChart = findViewById(R.id.swar_practice_linechart);
+        lineChart.setVisibility(View.VISIBLE);
+        readSettings();
+        createChart();
     }
 
     // Enable back button on the action bar
@@ -109,7 +111,6 @@ public class SwarPracticeActivity extends AppCompatActivity {
         elapsedTimeInSecs = 0;
         totalCentError = 0;
         totalVol = 0;
-        //lineChart.clear();
     }
 
     @Override
@@ -132,6 +133,7 @@ public class SwarPracticeActivity extends AppCompatActivity {
                 frequencyAnalyzer = recorder.frequencyAnalyzer;
                 frequencyAnalyzer.swarPracticeActivity = this;
                 readSettings();
+                frequencyAnalyzer.setPreferences(rootNote, rootOctave, thaat, minSoundLevel);
                 micButton.setIconResource(R.drawable.ic_baseline_mic_off_24);
                 micButton.setBackgroundColor(getResources().getColor(R.color.red));
                 records = new Record[150];
@@ -140,6 +142,7 @@ public class SwarPracticeActivity extends AppCompatActivity {
                     records[i].swar = -1;
                     records[i].cent = -1;
                 }
+                lineChart.getLineData().clearValues();
             } else {
                 recorder.stopRecording();
                 micButton.setIconResource(R.drawable.ic_baseline_mic_on_24);
@@ -174,7 +177,6 @@ public class SwarPracticeActivity extends AppCompatActivity {
             this.minSoundLevel = minSoundLevel;
             this.showSoundLevel = showSoundLevel;
         }
-        frequencyAnalyzer.setPreferences(rootNote, rootOctave, thaat, minSoundLevel);
         return change;
     }
 
@@ -216,7 +218,9 @@ public class SwarPracticeActivity extends AppCompatActivity {
             if(nPitches >= 4)
                 prevSwar4 = records[(nPitches - 4) % records.length].swar;
 
-            if(swar == prevSwar && swar == prevSwar2 && swar == prevSwar3) {
+            if(swar == prevSwar && swar == prevSwar2
+                   // && swar == prevSwar3
+            ) {
                 if(swar != prevSwar4)
                     startSwar = true; // we found a new start
                 else
@@ -240,7 +244,7 @@ public class SwarPracticeActivity extends AppCompatActivity {
         totalVol += curSoundLevel;
 
         elapsedTimeInSecs = swarCounter * 1F / FrequencyAnalyzer.ANALYZE_SAMPLES_PER_SECOND;
-        if(swarCounter >= 2) {
+        if(swarCounter >= 2) { // reduce gitter by not drawing every swar
             calcSD();
             updateView();
         }
@@ -305,38 +309,46 @@ public class SwarPracticeActivity extends AppCompatActivity {
         if(lineData == null) {
             lineData = lineChart.getData();
         }
+
         ILineDataSet set = lineData.getDataSetByIndex(0);
         if (set == null) {
             set = createCentSet();
             lineData.addDataSet(set);
             //lineChart.zoom(1f, 1.5f, 0, 0, YAxis.AxisDependency.RIGHT);
         }
-        set.addEntry(new Entry(set.getEntryCount(), curCent));
+        set.addEntry(new Entry(set.getEntryCount(), swar));
+
         // move to the latest entry
         lineChart.moveViewToX(lineData.getEntryCount());
         lineData.notifyDataChanged();
         // let the chart know it's data has changed
         lineChart.notifyDataSetChanged();
         // limit the number of visible entries
-        lineChart.setVisibleXRangeMaximum(120); // has to be here not in createChart
+        lineChart.setVisibleXRangeMaximum(60); // has to be here not in createChart
     }
 
     private void createChart() {
-        lineChart.setTouchEnabled(false);
+        lineChart.setTouchEnabled(true);
         lineChart.getDescription().setEnabled(false); // disable description
         // disable scaling and dragging
-        lineChart.setDragEnabled(false);
+        lineChart.setDragEnabled(true);
         lineChart.setDragYEnabled(false);
         lineChart.setScaleEnabled(false);
-        lineChart.setPinchZoom(false); // force pinch zoom along both axis
+        lineChart.setPinchZoom(true); // force pinch zoom along both axis
         lineChart.setDrawGridBackground(true);
+        lineChart.setBackgroundColor(Color.WHITE);
+        lineChart.setGridBackgroundColor(Color.WHITE);
 
-        setCentAxis(lineChart.getAxisRight());
+
+        setNotesAxis(lineChart.getAxisRight());
         lineChart.getAxisLeft().setEnabled(false);
         // setVolumeAxis();
 
         XAxis xAxis = lineChart.getXAxis();
         xAxis.setAvoidFirstLastClipping(true);
+        xAxis.setDrawGridLines(false);
+        xAxis.setDrawAxisLine(false);
+        xAxis.setPosition(XAxis.XAxisPosition.BOTTOM);
 
         Legend l = lineChart.getLegend();
         l.setEnabled(false);
@@ -347,38 +359,39 @@ public class SwarPracticeActivity extends AppCompatActivity {
         lineChart.setData(lineData);
     }
 
-    private void setCentAxis(YAxis yAxis) {
+    private void setNotesAxis(YAxis yAxis) {
+        yAxis.setValueFormatter(new SwarFormatter(rootNote, thaat)); //Used to write Note characters
+        yAxis.setLabelCount(14, true); //14 number to properly align gridlines with swar
         yAxis.setEnabled(true);
-        // yAxis.setValueFormatter(new FrequencyFormatter(rootNote, rootOctave)); //Used to write Note characters
-
-        // yAxis.setLabelCount(4, true); // Show only C labels
         yAxis.setDrawLabels(true);
-        yAxis.setGridColor(Color.BLACK);
-
+        //yAxis.setGridColor(Color.BLACK);
         yAxis.setTextColor(Color.BLACK);
         yAxis.setTextSize(14);
-        yAxis.setDrawGridLines(false);
-        yAxis.setGridLineWidth(1.5f);
-        //drawNotesLines(yAxis);
+        yAxis.setDrawGridLines(true);
+        yAxis.setDrawZeroLine(true);
+        yAxis.setGridLineWidth(0.5f);
+        yAxis.setGridColor(Color.LTGRAY);
+        yAxis.setAxisMaximum(12);
+        yAxis.setAxisMinimum(-1);
         lineChart.notifyDataSetChanged();
     }
 
     private LineDataSet createCentSet() {
         LineDataSet set = new LineDataSet(null, "Frequency Data");
-        set.setMode(LineDataSet.Mode.CUBIC_BEZIER);
+        set.setMode(LineDataSet.Mode.HORIZONTAL_BEZIER);
         set.setAxisDependency(YAxis.AxisDependency.RIGHT);
         //Set set.setColor to same as lineChart.setBackgroundColor to hide jump lines.
         set.setColor(getResources().getColor(R.color.light_blue_600));
-        // set.setFillColor(R.color.light_blue_A200);
+        //set.setFillColor(Color.WHITE);
         set.setCircleColor(Color.BLACK);
-        set.setLineWidth(.2f); // .2f is almost invisible
-        set.setCircleRadius(1.4f);
-        set.setFillAlpha(65); // doesn't make any change ?
+        set.setLineWidth(1.2f); // .2f is almost invisible
+        //set.setFillAlpha(65); // doesn't make any change ?
         // set.setHighLightColor(Color.rgb(244, 117, 117)); // not sure what this is for
         set.setValueTextColor(Color.BLACK);
         // set.setValueTextSize(9f);
         set.setDrawValues(false);
-        //set.setDrawCircles(false); // added to not draw points
+        set.setCircleRadius(1f);
+        set.setDrawCircles(false); // added to not draw points
         return set;
     }
 }

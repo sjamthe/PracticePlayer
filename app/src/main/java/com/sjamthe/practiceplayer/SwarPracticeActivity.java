@@ -29,7 +29,7 @@ public class SwarPracticeActivity extends AppCompatActivity {
     private TextView scaleText, avgCentErrorText, startCentErrorText, centErrorSDText, volSDPctText;
     private TextView durationText, swarText;
     private int minCentError, maxCentError, curCentError, avgCentError, centErrorSD, startCentError;
-    private int volSDPct, totalVol, nPitches, totalCentError, swarCounter, swar;
+    private int volSDPct, totalVol, nPitches, totalCentError, swarCounter, swar, perfectCent;
     private int prevSwar = -1;
     float elapsedTimeInSecs;
     private MaterialButton micButton;
@@ -54,7 +54,7 @@ public class SwarPracticeActivity extends AppCompatActivity {
         float soundLevel;
     };
     private Record[] records;
-    boolean startSwar = false;
+    // boolean startSwar = false;
     boolean endSwar = false;
 
     @Override
@@ -180,7 +180,7 @@ public class SwarPracticeActivity extends AppCompatActivity {
         return change;
     }
 
-    public void updateChart(float cent, float songCent, float soundLevel, float avgSoundLevel) {
+    public void updateChart(float cent, float soundLevel) {
         // If last 3 swaras are same we have a new swar (and some check on volume)
         // if swar is different from prev swar look for end
         if(nPitches >= 1) {
@@ -205,11 +205,10 @@ public class SwarPracticeActivity extends AppCompatActivity {
         records[pos].swar = swar;
         if(swar != prevSwar) {
             endSwar = true;
-            startSwar = false;
+            // startSwar = false;
         } else {
             endSwar = false;
-            swarCounter++;
-            // See if we are starting a new swar (only 3 last swar match)
+            /* See if we are starting a new swar (only 3 last swar match)
             int prevSwar4 = -1, prevSwar3 = -1, prevSwar2 = -1;
             if(nPitches >= 2)
                 prevSwar2 = records[(nPitches - 2) % records.length].swar;
@@ -218,34 +217,41 @@ public class SwarPracticeActivity extends AppCompatActivity {
             if(nPitches >= 4)
                 prevSwar4 = records[(nPitches - 4) % records.length].swar;
 
-            if(swar == prevSwar && swar == prevSwar2
-                   // && swar == prevSwar3
-            ) {
+            if(swar == prevSwar && swar == prevSwar2 && swar == prevSwar3) {
                 if(swar != prevSwar4)
                     startSwar = true; // we found a new start
                 else
                     startSwar = false;
-            }
+            }*/
         }
         if(endSwar) {
+            if(swarCounter % 5 != 0)
+                calcSD(); // for final results in case we skipped
+            //Store data
+
             init(); // initialize all counters;
             swarCounter = 1;
+        } else {
+            swarCounter++;
+            if(swarCounter % 5 == 0) // reduce load
+                calcSD();
         }
         //Calculate error
-        curCentError = (int) (cent - Math.round(cent / 100) * 100);
+        curCentError = (int) (cent - FrequencyAnalyzer.centToPerfectCent(cent));
         if (curCentError < minCentError || swarCounter == 1)
             minCentError = curCentError;
         if (curCentError > maxCentError || swarCounter == 1)
             maxCentError = curCentError;
-        if (swarCounter == 1)
+        if (swarCounter == 1) {
             startCentError = curCentError;
+            perfectCent = FrequencyAnalyzer.centToPerfectCent(cent);
+        }
         totalCentError += curCentError; // Not absolute value
         avgCentError = totalCentError / swarCounter;
         totalVol += curSoundLevel;
-
         elapsedTimeInSecs = swarCounter * 1F / FrequencyAnalyzer.ANALYZE_SAMPLES_PER_SECOND;
+
         if(swarCounter >= 2) { // reduce gitter by not drawing every swar
-            calcSD();
             updateView();
         }
 

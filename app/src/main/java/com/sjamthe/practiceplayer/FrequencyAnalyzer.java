@@ -396,8 +396,7 @@ public class FrequencyAnalyzer {
     private final Runnable runUpdateSwarActivity = new Runnable() {
         @Override
         public void run() {
-            swarPracticeActivity.updateChart(lastCent, songCent, (float) soundLevel,
-                    (float) (totalSoundLevel/(nPitches+1)));
+            swarPracticeActivity.updateChart(lastCent, (float) soundLevel);
         }
     };
 
@@ -430,11 +429,11 @@ public class FrequencyAnalyzer {
                 analyze();
             }
         }
+        // Send the data back for player. this should not affect microphone
         if(nPitches >= 3) {
             //  We lag the display by 3 pitches so we can correct n-3 by looking forward
             // displayCent = centBuffer[(nPitches - 3)%pitchBuffer.length];
             // read data that was analyzed but same size that came in
-            // TODO(sjamthe): We should not lag when we are on lic mic only on recoding
             resOut = new short[res.length];
             for (int i = 0; i < resOut.length; i++) {
                 resOut[i] = inputBuffer[readPos%inputBuffer.length];;

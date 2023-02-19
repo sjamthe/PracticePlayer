@@ -46,6 +46,8 @@ import com.github.mikephil.charting.interfaces.datasets.ILineDataSet;
 import com.google.android.material.button.MaterialButton;
 import com.sjamthe.practiceplayer.databinding.ActivityFullscreenBinding;
 
+import org.w3c.dom.Text;
+
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Locale;
@@ -437,6 +439,8 @@ public class FullscreenActivity extends AppCompatActivity {
         } else if(cent > 0) {
             lastCents.setText(FrequencyAnalyzer.SWARAS[swar]);
             thaatText.setText(String.format("%s vol:%d", this.thaat, (int) soundLevel));
+            Log.d("MAIN", x + ":swar:" + FrequencyAnalyzer.SWARAS[swar] + ":cent:"+
+                    cent + ":vol:" + soundLevel);
         } else {
             lastCents.setText("-");
             thaatText.setText(String.format("%s vol:%d", this.thaat, (int) soundLevel));
@@ -858,11 +862,13 @@ public class FullscreenActivity extends AppCompatActivity {
         mHideHandler.removeCallbacks(mHideRunnable);
         mHideHandler.postDelayed(mHideRunnable, delayMillis);
     }
-
+/*
     public static class SettingsFragment extends PreferenceFragmentCompat {
         @Override
         public void onCreatePreferences(Bundle savedInstanceState, String rootKey) {
             setPreferencesFromResource(R.xml.note_preferences, rootKey);
         }
     }
+
+ */
 }

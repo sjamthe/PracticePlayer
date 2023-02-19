@@ -41,4 +41,11 @@
             android:key="show_sound_level"
             android:title="Plot Sound Level on chart" />
     </PreferenceCategory>
+    <PreferenceCategory android:title="Storage Settings">
+    <Preference
+        android:key="uri_preference"
+        android:title="Data"
+        android:summary="Store URI."
+        android:widgetLayout="@layout/uri_preference"/>
+    </PreferenceCategory>
 </PreferenceScreen>
